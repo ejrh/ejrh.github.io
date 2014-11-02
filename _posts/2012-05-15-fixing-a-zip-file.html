@@ -1,0 +1,49 @@
+---
+layout: post
+title: Fixing a ZIP file
+date: 2012-05-15 19:58:56.000000000 +12:00
+categories:
+- Programming
+tags:
+- python
+- zip
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-05-15
+    07:58:56";}
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">A certain firewall I know habitually chops off the last few bytes of some responses. It's usually noticeable when large binaries are downloaded. Installers may fail to run (fortunately most of them contain an integrity check), and ZIP files may refuse to open. In the old DOS days, one could attempt a repair of such a ZIP file with a program called PKZIPFIX. Most modern archive managers do not include repair functionality. (It should be noted that repair can take two approaches: single-bit repairs using redundant recovery information; and salvaging of the unaffected files in an archive. Some archive formats, such as RAR, can carry recovery information, but only the latter approach is applicable to ZIP files.)<!--more--></p>
+<p style="text-align:justify;">Fortunately, the last few bytes of a ZIP file aren't actually all that important. A ZIP file consists of two parts:</p>
+<ol style="text-align:justify;">
+<li>A sequence of individually compressed files, each with its own header.</li>
+<li>A "central directory", repeating all the header information in a compact format.</li>
+</ol>
+<p style="text-align:justify;">In the case of my broken download, a 30 MB archiving containing 3000 files has about 1% overhead for the central directory. So up to 300k can be chopped off without affecting the actual data. (And, in theory, the ZIP file could have been another 1% smaller.)</p>
+<p style="text-align:justify;">The purpose of the central directory is to provide an efficient means to list the contents of the file, and to extract any individual file. It is also treated by modern archive managers as the first thing to be read when a ZIP file is opened; if it's not intact, the archive is deemed to be unrecognisable.</p>
+<p style="text-align:justify;">Even when the central directory is corrupted, all the file data is still there. The only problem is that the programs for extracting it rely on the central directory, rather than the file headers, to locate it.</p>
+<p style="text-align:justify;">A look at the code for Python's <code><a title="Python's zipfile module source code" href="http://hg.python.org/cpython/file/26b8ec8a7800/Lib/zipfile.py">zipfile</a></code> module confirms that it uses the central directory to build a list of files in the archive. However, it also contains useful snippets of code for parsing the file headers individually. With access to zipfile's internal structures, and a bit of copying and pasting, we can write a simple loop to process the files in order, without reading the central directory.</p>
+<p>[sourcecode language="python"]while True:<br />
+    # Read and parse a file header (copied from zipfile)<br />
+    fheader = f.read(zipfile.sizeFileHeader)<br />
+    fheader = struct.unpack(zipfile.structFileHeader, fheader)<br />
+    fname = f.read(fheader[zipfile._FH_FILENAME_LENGTH])<br />
+    if fheader[zipfile._FH_EXTRA_FIELD_LENGTH]:<br />
+        f.read(fheader[zipfile._FH_EXTRA_FIELD_LENGTH])<br />
+    print 'Found %s' % fname</p>
+<p>    # Fake a zipinfo record<br />
+    zi = zipfile.ZipInfo()<br />
+    zi.compress_size = fheader[zipfile._FH_COMPRESSED_SIZE]</p>
+<p>    # Read the file contents and save to disk<br />
+    zef = zipfile.ZipExtFile(f, zi)<br />
+    data = zef.read()<br />
+    write_data(fname, data)[/sourcecode]</p>
+<p style="text-align:justify;">This is a bit hacky, so a few sanity checks are in order. Check that the uncompressed data has the length recorded in the header. Compute its CRC32 code, and compare that with the header, too. We also want to confirm that all the files were recovered. So there is a successful termination condition: if the start of the central directory is read, then we know all files have been processed. If we reach the end of the archive without encountering it, then it's likely that some files at the end of the archive are lost.</p>
+<p style="text-align:justify;">The full (but still extremely hacky!) <a title="zipfix.py on Google Code" href="http://code.google.com/p/ejrh/source/browse/trunk/utils/zipfix.py">program</a> is in my project repository on Google Code.</p>
+<p style="text-align:justify;">Of course, my program only fixes ZIP files where the only damage is to the central directory. My understanding of tools like PKZIPFIX is that it would scan the entire archive for plausible file headers (those indicated by the signature <code>PK\x03\x04</code>). That is more exhaustive, but it would not be too hard to implement it.</p>

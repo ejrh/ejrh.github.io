@@ -1,0 +1,52 @@
+---
+layout: post
+title: IRC bot as a fun project
+date: 2012-11-14 18:16:19.000000000 +13:00
+categories:
+- Programming
+tags:
+- c
+- irc
+- prolog
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_404107: '1'
+  _publicize_pending: '1'
+  publicize_reach: a:2:{s:2:"fb";a:1:{i:1984850;i:29;}s:2:"wp";a:1:{i:0;i:17;}}
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";i:0;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-11-14
+    05:16:19";}
+  _wpas_done_1984850: '1'
+  _publicize_done_external: a:1:{s:8:"facebook";a:1:{i:100003511097471;b:1;}}
+author: 
+---
+<p style="text-align:justify;">Something I started working on last year: yet another IRC bot.</p>
+<p style="text-align:justify;">Since <a href="http://en.wikipedia.org/wiki/Internet_Relay_Chat" title="Internet Relay Chat at Wikipedia">IRC</a> is a simple protocol for sending plain text messages to channels or users, it provides opportunities for some good programming projects, such as a bot. An IRC bot is something that connects to an IRC network and provides some kind of automated service to the users on it. The potential applications of a bot are endless, and the only real limitation is that it has to communicate via plain text.</p>
+<p style="text-align:justify;">Writing an IRC bot is an excellent project for an interactive program -- within a few days you can have something that runs on the network and responds to messages. If you have an idea for something useful or fun it can do, even better. You just need to program the bot to understand for some commands and behave appropriately.</p>
+<h2>Probot</h2>
+<p style="text-align:justify;">My previous IRC bot was called Probot, and was written in <a href="http://en.wikipedia.org/wiki/C_%28programming_language%29" title="C at Wikipedia">C</a> and <a href="http://en.wikipedia.org/wiki/Prolog_%28programming_language%29" title="Prolog at Wikipedia">Prolog</a>: C to do all the low-level networking stuff, and Prolog to provide dynamic and configurable behaviour.  The implementation was a C program that used SWI-Prolog's C library bindings.</p>
+<p style="text-align:justify;">The idea was that it would receive commands in IRC messages in the form of Prolog goals, and it would then print the results of solving those goals. For example:</p>
+<p>[sourcecode language="erlang"]&lt;edmund&gt; probot: X is 2 +2 .<br />
+&lt;probot&gt; X = 4.[/sourcecode]</p>
+<p style="text-align:justify;">Or, with a slightly more ambitious goal involving access to outside data, backtracking and output:</p>
+<p>[sourcecode language="erlang"]&lt;edmund&gt; probot: pb_get_nicks(Ns), member(X, Ns), format(atom(G), 'Hi, ~s!', X), pb_speak(G).<br />
+&lt;probot&gt; Hi, ChanServ!<br />
+&lt;probot&gt; Hi, edmund!<br />
+&lt;probot&gt; Hi, probot![/sourcecode]</p>
+<p style="text-align:justify;"><code>pb_get_nicks/1</code> and <code>pb_speak/1</code> are predicates which return the IRC nicks of the currently visible users, and send a message to the IRC channel. The rest is standard Prolog: non-deterministically pick a member <code>X</code> of <code>Ns</code>, construct a greeting <code>G</code>, and send it to the channel, then backtrack until all possibilities are exhausted.</p>
+<p style="text-align:justify;">Of course, some predicates in Prolog change the environment. So it was possible to send commands to the bot that would affect how it processed further commands.</p>
+<p>[sourcecode language="erlang"]&lt;edmund&gt; probot: assertz(hi :- (pb_speaker(X), format(atom(G), 'Hi, ~s!', X), pb_speak(G))).<br />
+&lt;edmund&gt; probot: hi.<br />
+&lt;probot&gt; Hi, edmund![/sourcecode]</p>
+<p style="text-align:justify;">The entire Prolog program is a database of rules, which can be manipulated on the fly. Of course, Prolog is not the most straightforward language to use for this purpose. But I had envisioned various hooks and shorthands that would make this easier, for instance, defining goals that should be solved on each kind of IRC event. The syntax could be improved by defining new Prolog keywords, and even Prolog's <a title="Definite clause grammar at Wikipedia" href="http://en.wikipedia.org/wiki/Definite_clause_grammar">Definite Clause Grammars</a> could be used to add domain-specific languages for certain tasks. Sadly, <em>envisaging</em> is as far as I got with it before I lost the source.</p>
+<h2>xBot</h2>
+<p style="text-align:justify;">Last year there was a discussion on IRC about bot programming, spurred by the creation of <a title="xBot by Milos Ivanovic" href="http://github.com/milosivanovic/xbot">xBot</a>. xBot is a modular bot written by Milos Ivanovic that provides a variety of services to an IRC channel. One of the clever things about xBot as a Python program, is that the services are defined in modules, and modules can be loaded and changed without restarting the bot. This makes the develop-test cycle for bot services much, much shorter.</p>
+<h2>Starting again: IRCbot</h2>
+<p style="text-align:justify;">We were comparing notes and I was reminiscing about Probot to anyone who would listen. Since it's such an approachable project, I undertook to repeat it. The new bot would be more general purpose and not based on an esoteric logic programming language. Python is a good language to use for general projects of this sort (and it means I can borrow the reload functionality from xBot).</p>
+<p style="text-align:justify;">But what should IRCbot do? Choosing an original and suitable name for the project had sorely taxed my imagination. Coming up with realistic and useful features for it was no easier. The typical IRC bot responds to a formal command language, or simply makes announcements from an external source.</p>
+<p style="text-align:justify;">A more challenging (and interesting, but admittedly, less likely to be useful!) approach is to respond to IRC conversations in natural languages. There are several examples of conversation bots, such as the famous <a href="http://en.wikipedia.org/wiki/ELIZA">ELIZA</a> and the more modern <a href="http://en.wikipedia.org/wiki/Cleverbot">Cleverbot</a> (which xbot has a module for). A long time ago I was interested in the <a href="http://en.wikipedia.org/wiki/Loebner_Prize">Loebner Prize</a>, which is awarded each year to the program which comes closest to passing the Turing Test. I had ideas back then on analysing natural language, but I have learned a lot since; partly through studying formal languages in computer science, and partly through taking a stronger interest in language. I am not an linguist by any means but I think a program I wrote now would process language in more interesting ways than what I was planning back then.</p>
+<p style="text-align:justify;">A possible role of IRCbot is to connect a source of natural language -- conversations on IRC -- to a natural language analyser. Quite what the point is, I have not yet decided. But it will be interesting to see how sentence structure can be recognised, and how repeatedly used words relate to each other over the course of a conversation. This is still a long way from being a viable Loebner Prize entry (which would require the program to uphold one end of a conversation), but may give interesting results, and should be an interesting programming challenge in any case (which is what I'm really after).</p>
+<p style="text-align:justify;">IRCbot therefore provides two avenues of exploration: construction a reasonable IRC bot architecture, and the creation of a natural language processing engine. I will blog about these in the future.</p>

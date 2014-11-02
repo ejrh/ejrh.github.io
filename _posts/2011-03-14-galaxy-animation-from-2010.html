@@ -1,0 +1,26 @@
+---
+layout: post
+title: Galaxy animation from 2010
+date: 2011-03-14 18:26:34.000000000 +13:00
+categories:
+- Science
+- Simulation
+tags:
+- gravity
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-05-08
+    07:53:45";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">I've been rewriting a gravity simulator (see my earlier posts on <a title="Ephemerides from JPL Horizons" href="http://ejrh.wordpress.com/2011/02/10/ephemerides-from-jpl-horizons/">ephemerides</a> and <a title="Faking relativity" href="http://ejrh.wordpress.com/2011/03/05/faking-relativity/">relativity</a>).  This isn't because I've thought of a better design or come upon a better technology for it.  It's because I lost the first version!  I've recovered almost up to the point where I was before, writing essentially the same program (in C, with naive n-body and <a title="Barnes-Hut simulation at Wikipedia" href="http://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation">Barnes-Hut</a> implementations).<br />
+<!--more--></p>
+<p style="text-align:justify;">The main difference between the two projects is that the first one aimed at simulating galaxies.  By "galaxy" I mean a system with thousands of stars; billions is not computationally feasible with my program and hardware (yet).  This time round, I've concentrated on a solar system simulation, with the actual planets of our own system and several of their major moons.  I've tried re-exploring galaxies but it's quite hard to find starting conditions that result in a pleasing shape.  Perhaps the trick is to take data for a real galaxy and scale it down in a consistent manner.</p>
+<p style="text-align:justify;">The one artefact of the previous version is this animation of a galaxy.  I do not know the scale, number of stars, or starting conditions.  I recall that the colours are assigned by initial distance from centre, and are there to a) make it look more like a celestial object and less like abstract pixels; and b) indicate whether the initial distance of a star predicts distance once a steady state is reached.  (And, when rerun with a steady state as the initial conditions, whether stars tend to maintain their distance.)</p>
+<p>[youtube=http://www.youtube.com/watch?v=EYw44V8sSaQ]</p>

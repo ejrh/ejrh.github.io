@@ -1,0 +1,53 @@
+---
+layout: post
+title: Snowflake
+date: 2011-12-13 12:32:46.000000000 +13:00
+categories:
+- Programming
+tags:
+- python
+- snowflake
+- wx
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:54:"http://ejrh.files.wordpress.com/2011/12/snowflake1.png";s:6:"images";a:2:{s:54:"http://ejrh.files.wordpress.com/2011/12/snowflake1.png";a:6:{s:8:"file_url";s:54:"http://ejrh.files.wordpress.com/2011/12/snowflake1.png";s:5:"width";s:4:"1684";s:6:"height";s:4:"1023";s:4:"type";s:5:"image";s:4:"area";s:7:"1722732";s:9:"file_path";s:0:"";}s:54:"http://ejrh.files.wordpress.com/2011/12/snowflake2.png";a:6:{s:8:"file_url";s:54:"http://ejrh.files.wordpress.com/2011/12/snowflake2.png";s:5:"width";s:3:"924";s:6:"height";s:3:"993";s:4:"type";s:5:"image";s:4:"area";s:6:"917532";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"2";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-12-12
+    23:32:46";}
+  _wpas_done_linkedin: '1'
+author: 
+---
+<p style="text-align:justify;">A simple hierarchical data layout system. Originally intended for mind maps. Here's my work mind map:</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/12/snowflake1.png"><img class="aligncenter size-full wp-image-1473" title="snowflake1" src="assets/snowflake1.png" alt="" width="640" height="388" /></a></p>
+<p><!--more--></p>
+<p style="text-align:justify;">This is what I was working on at the end of last year. I was told to post about this when I started blogging in January. Better late than never!</p>
+<p style="text-align:justify;">The goal was to have a mind map program that allowed for simple and efficient input, with all the layout decisions to be taken automatically based on simple rules. There is very limited layout configurability: you can specify the of a node's children (clockwise), and you can specify the hue of a node, which will be inherited (with some mutation) by its children. In the above example, the node being edited (towards the top, in the centre) has its hue set to 0 (which is red in the <a title="HSL colour space at Wikipedia" href="http://en.wikipedia.org/wiki/HSL_and_HSV">HSV colour space</a>).</p>
+<p style="text-align:justify;">After about one day of work with <a title="wxPython home page" href="http://wxpython.org/">wxPython</a>, it had reached this state:</p>
+<p>[youtube=http://www.youtube.com/watch?v=E1EUeJb8jL8]</p>
+<p style="text-align:justify;">As I recall, I made that demo before I implemented the ability to save. The huge (and whimsical rather than authoritative) taxonomy tree had to be input anew.</p>
+<p style="text-align:justify;">Nodes are drawn in a hierarchically radial pattern. Depending on the input data, the results can be quite symmetric. Hence the name "Snowflake". Here's an early layout:</p>
+<h2><a href="http://ejrh.files.wordpress.com/2011/12/snowflake2.png"><img class="aligncenter size-full wp-image-1474" title="snowflake2" src="assets/snowflake2.png" alt="" width="640" height="687" /></a>Current features and bugs</h2>
+<ul>
+<li style="text-align:justify;">Scrolling, zooming and recentering.</li>
+<li style="text-align:justify;">Quick insertion of nodes; type INSERT then a sequence of strings, and each will become a child of the current node.</li>
+<li style="text-align:justify;">Editing of node text and attributes. The one supported attribute is hue.</li>
+<li style="text-align:justify;">Automatic text wrapping (though not perfect; it's supposed to try to fit the text into an approximate square, circle would be better but even the square is a bit challenging).</li>
+<li style="text-align:justify;">Cut, copy and paste. The copy format is plain text, with indentation to show hierarchy. This is pretty useful for moving data to and from documents.</li>
+<li style="text-align:justify;">Pivot and set root commands. Pivot swaps a node with its parent.</li>
+<li style="text-align:justify;">Undo and redo (with a small bug around the set root operation).</li>
+<li style="text-align:justify;">Import from <a title="FreeMind home page" href="http://freemind.sourceforge.net/wiki/index.php/Main_Page">FreeMind</a> mind maps (using regular expressions to parse XML, ick!).</li>
+<li style="text-align:justify;">An About box. ;)</li>
+</ul>
+<h2>Ideas for future work</h2>
+<ul>
+<li style="text-align:justify;">The last major enhancement I had begun was an orthoganal layout mode. I lost the work on this but I've been gradually reconstructing it. It requires significant refactoring the layout algorithm.</li>
+<li style="text-align:justify;">Additional formatting options.</li>
+<li style="text-align:justify;">Ability to add non-tree links between nodes. I have no idea how these will be laid out.</li>
+<li style="text-align:justify;">Import and export from other formats, such as <a title="GraphViz home page" href="http://graphviz.org/">GraphViz</a>'s dot format.</li>
+<li style="text-align:justify;">URLs and images in nodes.</li>
+<li style="text-align:justify;">Improved text wrapping algorithm. Donald Knuth built (part of) his reputation on <a title="Knuth's TeX at Wikipedia" href="http://en.wikipedia.org/wiki/TeX">highly aesthetic text layout</a> and kerning; I hacked mine together in a couple of days and it shows.</li>
+<li style="text-align:justify;">Improved layout algorithm, particularly reducing the amount of white space. Nodes are currently aggregated into bounding spheres, and these are packed at each level. Packing across multiple levels could reduce the amount of space.</li>
+<li style="text-align:justify;">A search function.</li>
+</ul>
+<p style="text-align:justify;">There's no downloadable package yet, but the <a title="Snowflake source on Google Code" href="http://code.google.com/p/ejrh/source/browse/trunk/snowflake/">source</a> is on my project hosting site. There is also a list of <a title="Snowflake issues on Google Code" href="http://code.google.com/p/ejrh/issues/list?q=Subproject%3DSnowflake">open issues</a>; I mention it mostly as additional reading. Once again, I make no promises about when I'll address any of them.</p>

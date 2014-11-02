@@ -1,0 +1,26 @@
+---
+layout: post
+title: Image PCA animation
+date: 2012-04-26 22:26:00.000000000 +12:00
+categories:
+- Programming
+tags:
+- animation
+- image
+- pov-ray
+- principal components analysis
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-04-26
+    10:26:00";}
+author: 
+---
+<p style="text-align:justify;">A short follow up to the earlier post on <a title="Images in space" href="http://ejrh.wordpress.com/2012/04/22/images-in-space/">image analysis</a>. We can cram another principal component into the visualisation by going 3D. This animation depicts the first three components as spatial coordinates, and the second three as colour coordinates.</p>
+<p>[youtube=http://www.youtube.com/watch?v=8-v8BMl5ke4]</p>
+<p style="text-align:justify;">(There is a little POV-Ray sphere for each data point.)</p>
+<p style="text-align:justify;">There is an obvious shape and colour distribution. For instance, one end of the main body is blue, and the other is pink. I have to wonder if that implies a bug in my PCA algorithm. It is supposed to select orthogonal components.</p>
+<p style="text-align:justify;">How can I test it? It's a bit hard with 13 dimensions for each of 136742 data points. A smaller test case is necessary.</p>

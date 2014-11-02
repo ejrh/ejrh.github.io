@@ -1,0 +1,64 @@
+---
+layout: post
+title: Depth-first logic game AI
+date: 2011-05-12 10:16:32.000000000 +12:00
+categories:
+- Games
+- Programming
+tags:
+- ai
+- logic
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  _wpas_skip_linkedin: '1'
+author: 
+---
+<blockquote>
+<p style="text-align:justify;">"An answer for you? Yes, I have."<br />
+"To Everything? To the Great Question of Life, the Universe and Everything?"<br />
+"Yes. Though I don't think that you're going to like it."</p>
+</blockquote>
+<p><!--more--></p>
+<blockquote>
+<p style="text-align:justify;">"It doesn't matter! We must know it! Now!"<br />
+"All right, the Answer to the Great Question Of Life, the Universe and Everything is..." said Deep Thought, and paused.<br />
+"Yes...!"<br />
+"Is..."<br />
+"Yes...!!!...?"<br />
+"Forty-two," said Deep Thought, with infinite majesty and calm.</p>
+</blockquote>
+<p style="text-align:justify;">--- Douglas Adams in <a title="The Hitchhiker's Guide to the Galaxy at Wikipedia" href="http://en.wikipedia.org/wiki/The_Hitchhiker%27s_Guide_to_the_Galaxy"><em>The Hitchhiker's Guide to the Galaxy</em></a> (somewhat abridged)</p>
+<p style="text-align:justify;">By a staggering coincidence (well...), this is post number forty-two on my blog, and is about AI too! Not on the scale of the venerable Deep Thought, admittedly. In fact, some people would disqualify simple depth-first search from AI entirely (irregardless of its presence in <a title="COMP 307 home page at Victoria University" href="http://ecs.victoria.ac.nz/Year2012/COMP307">COMP 307</a>).</p>
+<p style="text-align:justify;">During my morning commute the last few days, I've found time to implement the depth-first AI for my <a title="AI for a logic game" href="http://ejrh.wordpress.com/2011/04/26/ai-for-a-logic-game/">logic game</a>, as proposed in that post.  I'd already spent a fair amount of time pondering it.</p>
+<p style="text-align:justify;">The main problem was how to manage backtracking in language that did not have it built-in.  Basically, the played makes a guess, and deduces further "facts" about the map based on it.  Now what happens if it runs into a contradiction?  It needs to undo all beliefs arising from that guess, and try something new.</p>
+<p style="text-align:justify;">I thought about storing an "undo list" of actions. Each action has a corresponding negation, e.g. an action to mark an edge as necessary can be negated by the action to remove that mark (that is, mark it as "not necessarily necessary"!). When a contradiction is reached, moves on the stack are popped and negated until the guess is reached. This is discarded and a different guess is made.</p>
+<p style="text-align:justify;">However quite a lot of rework and support for different actions was required here. Instead I opted to simply store the previous map state when making a guess, restoring it if the guess leads to a contradiction. The algorithms are:</p>
+<pre>solve_one:
+    solve a tile using deductive method if possible
+    if contradiction, rollback_guess
+    if no tiles to solve, make_guess
+
+make_guess:
+    pick a random unsolved tile
+    rotate it, and increment rotation counter for that tile
+    if rotation counter &gt; 4, contradiction!  go to rollback_guess
+    make a copy of the map, and save it somewhere
+    mark the the tile as solved
+
+rollback_guess:
+    restore the map from wherever it's been saved</pre>
+<p style="text-align:justify;">Part of the trick is that guesses can be made in series: if a guess is rolled back and there are no other viable moves, then the previous guess much be rolled back too. The saved maps are stored in a stack. In principle, if the game is won, then everything on the stack can be discarded, and the AI can stop. But if the last remaining guess is popped and the rotation counter &gt; 4, then something has gone horribly wrong!</p>
+<ul style="text-align:justify;">
+<li>Perhaps a consequent guess has erroneously been marked as contradictory, and the AI should restart guessing from step 1.</li>
+<li>Perhaps the map as deduced before guessing began was contradictory, and no combination of guesses can solve it (and the AI should undo all deductions and start again).</li>
+<li>Perhaps a human interfered with the board while the AI was running and confused it, and either of the above has happened.</li>
+</ul>
+<p style="text-align:justify;">No protection against any of these risks has been implemented yet. Detection of a win is not properly detected yet either: the AI will guess all remaining tiles without meeting a contradiction. It then stops as there are deductions to make, and no possible guesses. Unfortunately it's possible that the map has been completed without contradiction, but without lighting up all targets (there will be self-contained loops of wire disconnected from the source). That's the case the AI should look for, and roll back from when detected.</p>
+<p style="text-align:justify;">Anyway, testing shows the player can now almost always solve the game.  It even handles the cases with multiple solutions, by settling for the first successful one it tries.  I tried to get a screenshot of one of a complete and consistent non-solution, but it doesn't seem to generate those now!  I'll finish up with this animation of the player solving a a small map entirely by guessing:</p>
+<p>[caption id="attachment_587" align="aligncenter" width="150" caption="Generate-and-test -- also known as brute-force ;-)"]<a href="http://ejrh.files.wordpress.com/2011/05/network5.gif"><img class="size-full wp-image-587" title="network5" src="assets/network5.gif" alt="" width="150" height="150" /></a>[/caption]</p>

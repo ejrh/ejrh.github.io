@@ -1,0 +1,73 @@
+---
+layout: post
+title: Debugging wxPython programs
+date: 2012-05-23 21:38:40.000000000 +12:00
+categories:
+- Programming
+tags:
+- python
+- threading
+- wx
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-05-23
+    09:38:40";}
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+author: 
+---
+<p style="text-align:justify;"><a title="wxPython home page" href="http://wxpython.org/">wxPython</a> is a great way to write full-featured native GUI applications in Python.  It's a wrapper for <a title="wxWidgets home page" href="http://www.wxwidgets.org/">wxWidgets</a>, a portable windowing toolkit written in C++.  (wxWidgets used to be called wxWindows, but, thanks to Microsoft's inexcusable penchant for giving all their products idiotically generic names, inevitably had to be renamed.)<br />
+<!--more--></p>
+<p style="text-align:justify;">But it can be painstaking to add program features: you add a few lines, restart the app, and try to test that they behave correctly.  Then repeat for the next few lines. This is only made a harder by Python's dynamic typing, because so many more incorrect pieces of code are happily admitted by the parser and runtime, and only become apparent when actually executed.</p>
+<p style="text-align:justify;">With most Python programs you can use the command line interpreter to run individual functions, or type in snippets of Python code to quickly test them.  You can also use Python's introspective facilities to find out how to use a module.  There are two particular functions which are great for this:</p>
+<ol style="text-align:justify;">
+<li><code>dir(x)</code>, which will return a list of the properties on <code>x</code>.  <code>x</code> could be a module, class or any other object; also the somewhat longwinded <code>[k for k in dir(x) if 'str' in k]</code> when the list is long and you want to cut it down to likely possibilities.</li>
+<li><code>help(x)</code>, which will print all available inbuilt documentation on the object <code>x</code>.  By default the help text will consist of the a list of the method definitions in <code>x</code> (if <code>x</code> is a class or an instance of a class), or a recursive list of definitions in a whole module if <code>x</code> is a module.  It will also include the docstrings if any are present.</li>
+</ol>
+<p style="text-align:justify;">When I'm learning to use a new module, I will load it on the command line, and find what I need using the these two functions.</p>
+<p style="text-align:justify;">But running a wxPython program is all or nothing affair.  The wxPython app is initialised, and then control is passed to the inbuilt main program loop.  How many times I've wanted to examine the value of part of my running app, just to see how it's behaving!  The workaround has been to add lots of print statements.</p>
+<p style="text-align:justify;">It occurred to me today that I could possibly run it alongside the Python command line.</p>
+<p style="text-align:justify;">Typical wxPython programs, as I write them, have a file <code>main.py</code> that looks like this:</p>
+<p>[sourcecode language="python"]from gui import MainFrame<br />
+import wx</p>
+<p>def main():<br />
+    app = wx.PySimpleApp()<br />
+    frame = MainFrame()</p>
+<p>    frame.Show(1)<br />
+    app.MainLoop()</p>
+<p>if __name__ == '__main__':<br />
+    main()[/sourcecode]</p>
+<p style="text-align:justify;"><code>app</code> and <code>frame</code> are Python objects that wrap a lot of serious C++ GUI code, which interacts with the operating system.  Essentially all of the application state is contained in those objects. Normally when the program is run, it is executed as above. When <code>app.MainLoop</code> is called, wxPython will take over and display an interactive, native window. That function only returns when the main window is closed.</p>
+<p style="text-align:justify;">I want to keep the command line running in the main thread, and launch the GUI in another thread. Doing so would mean I can test the GUI normally, but can also run snippets of code and introspect the running GUI from the command line.</p>
+<p style="text-align:justify;">I tried creating <code>app</code> and <code>frame</code> directly on the command line, and then starting <code>app.MainLoop</code> as a new thread:</p>
+<p>[sourcecode language="python"]from gui import MainFrame<br />
+import wx<br />
+app = wx.PySimpleApp()<br />
+frame = MainFrame()<br />
+frame.Show(1)<br />
+import threading<br />
+t = threading.Thread(target=app.MainLoop)<br />
+t.start()[/sourcecode]</p>
+<p style="text-align:justify;">It does not work, because wxPython has certain expectations about how these vital functions are executed. In particular, the main GUI code, including initialising the app and creating the main window, should all run from a single thread.</p>
+<p style="text-align:justify;">So instead, I tried something even simpler:</p>
+<p>[sourcecode language="python"]# In main.py:<br />
+def main():<br />
+    global app, frame<br />
+    ...</p>
+<p># On the command line:<br />
+import main<br />
+import threading<br />
+t = threading.Thread(target=main.main)<br />
+t.start()[/sourcecode]</p>
+<p style="text-align:justify;">At this point the GUI opens and runs normally. And the command line is ready for input at the same time! I can inspect it:</p>
+<p>[sourcecode language="python"]&gt;&gt;&gt; main.frame.GetTitle()<br />
+'SQL Editor'</p>
+<p>&gt;&gt;&gt; tab = main.frame.notebook.GetCurrentPage()<br />
+&gt;&gt;&gt; dir(tab.tc) # Find out what methods the text control on the tab supports<br />
+[..., 'Clear', ...]<br />
+&gt;&gt;&gt; tab.tc.Clear() # Remove all the text in the GUI text box on that tab<br />
+&gt;&gt;&gt; main.frame.Refresh() # Tell the GUI to update itself[/sourcecode]</p>
+<p style="text-align:justify;">These can be used to manipulate the running program in ad-hoc ways. There are dangers in doing so; a wild thread is coming and poking round in the internals of a running program, after all. But the GUI is mostly idle waiting for an event; in practice it is generally safe to examine it. Python's much-maligned Global Interpreter Lock protects the simple Python objects in it, and the C++ parts of wxWidgets are threadsafe -- up to a limit. wxWidgets uses a single thread for all graphical updates, which is why Refresh must be used from another thread to trigger drawing activity, rather than using drawing methods directly.</p>

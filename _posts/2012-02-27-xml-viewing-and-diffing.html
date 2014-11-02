@@ -1,0 +1,134 @@
+---
+layout: post
+title: XML viewing and diffing
+date: 2012-02-27 21:17:47.000000000 +13:00
+categories:
+- Programming
+tags:
+- diff
+- python
+- xml
+- xslt
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  tagazine-media: a:7:{s:7:"primary";s:51:"http://ejrh.files.wordpress.com/2012/02/wp-cats.png";s:6:"images";a:2:{s:51:"http://ejrh.files.wordpress.com/2012/02/wp-cats.png";a:6:{s:8:"file_url";s:51:"http://ejrh.files.wordpress.com/2012/02/wp-cats.png";s:5:"width";s:3:"469";s:6:"height";s:3:"403";s:4:"type";s:5:"image";s:4:"area";s:6:"189007";s:9:"file_path";s:0:"";}s:53:"http://ejrh.files.wordpress.com/2012/02/two-diffs.png";a:6:{s:8:"file_url";s:53:"http://ejrh.files.wordpress.com/2012/02/two-diffs.png";s:5:"width";s:3:"350";s:6:"height";s:3:"289";s:4:"type";s:5:"image";s:4:"area";s:6:"101150";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"2";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-02-27
+    08:29:43";}
+author: 
+---
+<p style="text-align:justify;"><strong>Another simple XML tool, and a neat recursive diffing algorithm. (Part of my growing toolkit of <a title="XML grep" href="http://ejrh.wordpress.com/2011/05/10/xml-grep/">XML tools</a>.)</strong><!--more--></p>
+<p style="text-align:justify;">A tool that's helpful when dealing with large numbers of XML data files is a simple, user-friendly XML viewer.  Most browsers can view raw XML in their window.  They format the XML according to its structure by indenting nested elements and colourising element names, attributes, comments, and content.  They also provide buttons to dynamically open and close longer elements to hide their contents. Unfortunately they are generally pretty ugly.</p>
+<p style="text-align:justify;">It turns out that a little bit of <a title="XSLT at Wikipedia" href="http://en.wikipedia.org/wiki/XSLT">XSLT</a> can be used to transform any XML document into a convenient HTML representation, as used in the browsers.  (It's possible that's what the browsers use internally, though I would expect them to use a more direct translation from the XML input to browser elements.)  The initial incentive to writing one myself was that I could pick the format of the resulting file.  But other benefits materialised along the way.</p>
+<h2>Rendering XML in HTML</h2>
+<p style="text-align:justify;">The basic program has templates to match each node kind in XML. Text nodes are handled by the default stylesheet rules, which simply copy them to the output. The template for comments renders the comment in a specific font, delimited by the XML syntax for comment beginnings and ends.</p>
+<p>[sourcecode language="xml"]&lt;xsl:template match=&quot;comment()&quot;&gt;<br />
+    &lt;div&gt;<br />
+        &lt;span class=&quot;text&quot;&gt;&amp;lt;!--&lt;/span&gt; &lt;span class=&quot;comment&quot;&gt;&lt;xsl:value-of select=&quot;.&quot; /&gt;&lt;/span&gt; &lt;span class=&quot;text&quot;&gt;--&amp;gt;&lt;/span&gt;<br />
+    &lt;/div&gt;<br />
+&lt;/xsl:template&gt;[/sourcecode]</p>
+<p style="text-align:justify;">The element template renders a syntax-highlighted start tag for the element and its attributes, calls apply-templates on the node's children, and renders an end-tag. Two forms are rendered: a short form, hidden by default, and a long form. A JavaScript action attached to the name in the start tag is used to hide one and unhide the other. There is some special casing for elements: an empty element is rendered as a single closed tag, and an element with a single piece of text content is rendered on a single line in long form only. The combined code is a bit complicated, and isn't helped by XSLT's own verbosity:</p>
+<p>[sourcecode language="xml"]&lt;xsl:template match=&quot;*&quot;&gt;<br />
+    &lt;!-- First render the content into a variable. --&gt;<br />
+    &lt;xsl:variable name=&quot;content&quot;&gt;<br />
+        &lt;xsl:apply-templates select=&quot;node()|comment()&quot; /&gt;<br />
+    &lt;/xsl:variable&gt;</p>
+<p>    &lt;!-- If there are any child elements, then it is closable, so render a short form. --&gt;<br />
+    &lt;xsl:if test=&quot;./*&quot;&gt;<br />
+        &lt;div class=&quot;short&quot;&gt;<br />
+            &lt;!-- Start tag. --&gt;<br />
+            &lt;xsl:call-template name=&quot;start-tag&quot;&gt;<br />
+                &lt;xsl:with-param name=&quot;class&quot; select=&quot;'short-name'&quot; /&gt;<br />
+            &lt;/xsl:call-template&gt;<br />
+            &lt;!-- Indicator of hidden content. --&gt;<br />
+            ...<br />
+            &lt;!-- End tag. --&gt;<br />
+            &lt;span class=&quot;tag&quot;&gt;&amp;lt;/&lt;xsl:value-of select=&quot;name()&quot; /&gt;&amp;gt;&lt;/span&gt;<br />
+        &lt;/div&gt;<br />
+    &lt;/xsl:if&gt;</p>
+<p>    &lt;!-- Render a long form. --&gt;<br />
+    &lt;div class=&quot;long&quot;&gt;<br />
+        &lt;!-- Start tag; will be complete closed tag if there is no content. --&gt;<br />
+        &lt;xsl:call-template name=&quot;start-tag&quot;&gt;<br />
+        &lt;/xsl:call-template&gt;</p>
+<p>        &lt;!-- But if there is content... --&gt;<br />
+        &lt;xsl:if test=&quot;./* or text() or comment()&quot;&gt;<br />
+            &lt;!-- If it's only a text element then render it inside the long form. --&gt;<br />
+            &lt;xsl:if test=&quot;normalize-space(text()) != ''&quot;&gt;<br />
+                &lt;span class=&quot;value&quot;&gt;&lt;xsl:value-of select=&quot;text()&quot; /&gt;&lt;/span&gt;<br />
+            &lt;/xsl:if&gt;</p>
+<p>            &lt;!-- But if there is element or comment data, then put the full rendered content, indented. --&gt;<br />
+            &lt;xsl:if test=&quot;./* or comment()&quot;&gt;<br />
+                &lt;div class=&quot;indent&quot;&gt;<br />
+                    &lt;xsl:copy-of select=&quot;$content&quot; /&gt;<br />
+                &lt;/div&gt;<br />
+            &lt;/xsl:if&gt;</p>
+<p>            &lt;!-- Close tag. --&gt;<br />
+            &lt;span class=&quot;tag&quot;&gt;&amp;lt;/&lt;xsl:value-of select=&quot;name()&quot; /&gt;&amp;gt;&lt;/span&gt;<br />
+        &lt;/xsl:if&gt;<br />
+    &lt;/div&gt;<br />
+&lt;/xsl:template&gt;</p>
+<p>&lt;xsl:template name=&quot;start-tag&quot;&gt;<br />
+    &lt;xsl:param name=&quot;class&quot; select=&quot;'long-name'&quot; /&gt;</p>
+<p>    &lt;span class=&quot;tag&quot;&gt;&amp;lt;&lt;span&gt;<br />
+        &lt;!-- Set the CSS class of the node name's span. --&gt;<br />
+        &lt;xsl:if test=&quot;./*&quot;&gt;<br />
+            &lt;xsl:attribute name=&quot;class&quot;&gt;&lt;xsl:value-of select=&quot;$class&quot; /&gt;&lt;/xsl:attribute&gt;<br />
+        &lt;/xsl:if&gt;</p>
+<p>        &lt;xsl:value-of select=&quot;name()&quot; /&gt;<br />
+        &lt;/span&gt;</p>
+<p>        &lt;!-- Render the attributes. --&gt;<br />
+        &lt;xsl:for-each select=&quot;@*&quot;&gt;<br />
+            &lt;xsl:text&gt; &lt;/xsl:text&gt;<br />
+            &lt;span class=&quot;attr&quot;&gt;<br />
+                &lt;xsl:value-of select=&quot;name()&quot; /&gt;<br />
+            &lt;/span&gt;=&amp;quot;&lt;span class=&quot;text&quot;&gt;<br />
+                &lt;xsl:value-of select=&quot;.&quot; /&gt;<br />
+            &lt;/span&gt;&amp;quot;&lt;/xsl:for-each&gt;</p>
+<p>        &lt;!-- If no content, close the tag. --&gt;<br />
+        &lt;xsl:if test=&quot;not(./*) and not(text()) and not(comment())&quot;&gt; /&lt;/xsl:if&gt;&amp;gt;&lt;/span&gt;<br />
+&lt;/xsl:template&gt;[/sourcecode]</p>
+<p style="text-align:justify;">The XML files we use tend to contain repeated, complex elements.  For example, a single file might contain a trade, including a block of elements describing the flows on it, each with specific dates, numerical amounts, and other parameters.  The problem is that in XML the data is extremely verbose: a whole screenful might suffice to describe only a single flow.  The half-dozen fields of interest are buried in sea of angle brackets of ridiculously camel-case long element names.</p>
+<p style="text-align:justify;">Luckily, it turns out to be simple to add more specific template rules to render a summary table instead of the usual XML verbosity for these repeated elements.  Each row initially shows only the most salient fields from the element, but can be dynamically expanded to show the long form of the original XML source for it. The content within the long form is itself rendered using the normal templates, and can be opened and closed dynamically.</p>
+<p>[caption id="attachment_1805" align="aligncenter" width="469" caption="Categories in the EJRH Wordpress XML dump"]<a href="http://ejrh.files.wordpress.com/2012/02/wp-cats.png"><img class="size-full wp-image-1805" title="wp-cats" src="assets/wp-cats.png" alt="" width="469" height="403" /></a>[/caption]</p>
+<p style="text-align:justify;">This shows part of the Wordpress XML dump of this blog. Categories are presented as a summarised table, and one of them has been expanded to show its XML source.</p>
+<h2>Comparing two XML files</h2>
+<p style="text-align:justify;">There is a constant swarm of XML files, and there will be many versions of the XML for a given object. When something unexpected has happened, it's often useful to compare two of these versions to pinpoint the precise elements that have changed. There are two levels of comparison work to be done. Automatated comparison involves taking two sets of XML files and summarising the differences between them. Doing this usefully requires some knowledge of which elements are expected to have changed, and how the remaining element differences should be summarised.</p>
+<p style="text-align:justify;">Manual comparison is more ad-hoc, but more specific: take two XML files, and browse over the differences between them. This can be done in a normal text file merge tool. But merge tools aren't optimised for the XML case: they will throw up spurious differences with differing whitespace, and will completely ignore the structure of the two files. Such structure is extremely useful both to the tool that is attempting to match parts of the documents, and to a human who's trying to understand the parts that don't match.</p>
+<p style="text-align:justify;">In a further use of XSLT, it's possible to write a stylesheet that will take two XML files as input, and output a merged form of them. Nodes that are common to both are copied normally, but nodes that appear only in one side or the other are output with marks that indicate which side they come from. The viewing stylesheet can use these marks to render the differing nodes specially. In our case, nodes only in the first document (the left side) are marked red to indicate they were deleted, and nodes only in the second document are marked green to indicate they were added.</p>
+<p style="text-align:justify;">The recursive structure of XML makes this a bit different from normal text diffs. In some ways it is easier, because if there is a difference deep within an element that appears common to both sides, the job of deciding whether it is an addition or deletion is contained only to that element. In diffing, it's often easy to detect the start of a difference, but harder to find the end of it. The documents are no longer in sync when the difference is encountered, and heuristics are needed to locate a later point where they appear to be back in sync. With XML, that search can be safely confined to the single parent element.</p>
+<p style="text-align:justify;">It's also a bit more complicated, because there are several possible cases when comparing nodes of both side.</p>
+<ol style="text-align:justify;">
+<li>Nodes from L and R could be exactly the same.</li>
+<li>The node from L could have no corresponding node in R, because R is at the end of the parent element. (Or vice-versa.)</li>
+<li>Nodes from L and R could have different element names, and hence are different.</li>
+<li>Nodes from L and R could be the same superficially (e.g. have the same name), but different contents at some deeper level.</li>
+</ol>
+<p style="text-align:justify;">Cases one and two correspond to similar cases for text diffing. A line is obviously the same, or obviously an addition or removal because there are no more lines on the other side.</p>
+<p style="text-align:justify;">But in XML, elements can be the same at the top level, but different internally. The stylesheet computes a signature for each element, by default using only its kind (element, text, comment) and name (or text/comment contents). If the signatures are different, then it's case 3 and one of the sides is an addition or deletion. But if the signatures are the same but the contents are not, then it recursively merges the contents of each element. A single element is output, but marked as changed (but not deleted or inserted). This indicates that somewhere inside it, one of the child elements must be a deletion or insertion.</p>
+<p style="text-align:justify;">Deletions and additions are themselves a bit tricky in case 3. The node from L differs from the one from R. But was L's node deleted, or was R's added, or both? If we choose incorrectly, it's possible that the algorithm won't be able to detect the end of the change and synchronise the two sides again. What should be a simple single-node change will be output as a large, unnecessarily complicated difference.</p>
+<p style="text-align:justify;">There is a heuristic to pick which side to process. Each side has a match point: this is the distance to the nearest similar element (with the same signature in the other side). The side with the highest match point is assumed to be the extra, unmatchable node: it is output as an addition or deletion (depending on its side). The merge is then continued with the successor. The theory is that its opponent has a lower match point, meaning that it will soon be merged against one of the following nodes and is probably not a difference after all.</p>
+<p style="text-align:justify;">There was one interesting bug with this algorithm. In two documents of the form:</p>
+<p>[sourcecode language="xml"]&lt;!-- L --&gt;     |    &lt;!-- R --&gt;<br />
+&lt;element1/&gt;    |    &lt;element3/&gt;<br />
+WHITESPACE     |    WHITESPACE<br />
+&lt;element2/&gt;    |    &lt;element4/&gt;<br />
+WHITESPACE     |    WHITESPACE<br />
+&lt;element3/&gt;    |    &lt;element5/&gt;<br />
+WHITESPACE     |<br />
+&lt;element4/&gt;    |<br />
+WHITESPACE     |<br />
+&lt;element5/&gt;    |[/sourcecode]</p>
+<p style="text-align:justify;">The match point of L's element1 was 999999 (corresponding to no possible match in R), so it was output as a deletion. But the match point of its successor, WHITESPACE, was 2, while the match point of R's element3 was 4. Since element3 had a higher match point, it was output as an addition, even though it would eventually have merged perfectly with a later element in L. Subsequently, the two WHITESPACEs merged, then it began again with element2. The result was that all of L was output as an addition, even though it appears whole inside R.</p>
+<p>[caption id="attachment_1808" align="aligncenter" width="350" caption="Two ways of diffing two XML files; both are correct, but one is much easlier to read"]<a href="http://ejrh.files.wordpress.com/2012/02/two-diffs.png"><img class="size-full wp-image-1808" title="two-diffs" src="assets/two-diffs.png" alt="" width="350" height="289" /></a>[/caption]</p>
+<p style="text-align:justify;">This was fixed by outputing not just the single node from the side with the higher match point, but a sequence of nodes with length equal to one less than the opposing side's match point. In the above example, L's WHITESPACE has a match point of 999999, but the match point of R's element3 is 5, so four nodes of L are output as additions. This brings both sides into sync and the remaining elements merge properly.</p>
+<h2>Making it useable</h2>
+<p style="text-align:justify;">The viewer stylesheet creates self-contained HTML files with embedded JS and CSS. I'm not particularly talented with either, so it's not perfect, but it's useable.</p>
+<p style="text-align:justify;">A simple Python program uses <a title="libxml2 for Python" href="http://xmlsoft.org/python.html">libxml2</a> to parse the input files and apply the stylesheets. In Windows, this can be set up as a Send To option in the explorer context menu.</p>
+<p style="text-align:justify;">If the option <code>-m</code> is specified, the two inputs will be merged first. This can also be Send To option; if two items are selected when this option is chosen, Windows is smart enough to use the same program invocation for both.</p>
+<p style="text-align:justify;">It's not lightning fast. Processing a large XML file can take a few seconds, including the cost of starting up Python and loading libxml2. It's hard to estimate the cost of applying an XSLT stylesheet, but in general it seems to scale reasonably well over a variety of moderately large files. The merging algorithm is theoretically of O(<var>n</var><sup>2</sup>) complexity, because each node may need to be compared against each node on the other side. But it's still useable.</p>
+<p style="text-align:justify;">(I'll put the stylesheets and Python scripts into my <a title="Edmund's various projects and other free stuff" href="http://code.google.com/p/ejrh/">public repository</a> in the near future.)</p>

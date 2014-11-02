@@ -1,0 +1,54 @@
+---
+layout: post
+title: Pure-paper packable polyhedra in Python
+date: 2011-01-25 22:26:46.000000000 +13:00
+categories:
+- Math
+- Programming
+tags:
+- geometry
+- polyhedra
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+  _oembed_c9ae79816761e2c88913314fe769d2d2: ! '{{unknown}}'
+author: 
+---
+<p style="text-align:justify;">This messy little script generates SVG patterns.<br />
+<!--more--></p>
+<p style="text-align:justify;">I wrote it because I had a sudden urge to play with polyhedra.  The pattern of polygons is printed, then cut out and assembled.  It's even possible to construct a rickety solid (is that an oxymoron?) without glue or tape.  Interlocking tags in the paper hold it together:</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/01/orange.png"><img class="aligncenter size-medium wp-image-50" title="Truncated octahedon (&quot;orange&quot;)" src="assets/orange.png?w=283" alt="" width="283" height="300" /></a></p>
+<p style="text-align:justify;">This is the "orange", so called because it's one of the few packable archimedean solids.  It can be packed in layers like oranges (or any other approximately spherical fruit, for that matter); each successive layer is offset half a unit in both directions, with the "oranges" settling in the dimples in the layer below.</p>
+<h2>Algorithm and language</h2>
+<p style="text-align:justify;">It is akin to a <a title="Turtle graphics on Wikipedia" href="http://en.wikipedia.org/wiki/Turtle_graphics">Turtle</a> or <a title="L-system on Wikipedia" href="http://en.wikipedia.org/wiki/L-system">Lindenmayer system</a>.  Apart from that there is little rhyme or reason to the pattern language.  I just picked something that would figure out where to put polygons for me.  I'll try to describe it.  The grammar, I suppose, is something like this:</p>
+<pre>Pattern = Cmd
+Cmd     = Instr
+        | Instr '(' Cmd* ')'
+Instr   = {name of callable in provided dictionary}</pre>
+<p style="text-align:justify;">The interpreter maintains a cursor, which is a four-tuple of (xpos,ypos,angle,scale).  It finds the next Instr and calls that function, with the cursor as an argument.  An Instr function does two things:</p>
+<ol style="text-align:justify;">
+<li>It can optionally print some SVG text, and</li>
+<li>It returns a list of cursors, which may be derived from its input.</li>
+</ol>
+<p style="text-align:justify;">After calling an Instr function F, the interpreter will call the sub-commands in sequence on the cursors returned by F.  A missing or truncated sub-command list is padded out with extra copies of the "e" and "s" Instrs: "s" for the first returned cursor, and "e" for each subsequent one.</p>
+<p style="text-align:justify;">The idea is that the Instrs correspond to shapes; for instance, to the faces of a polyhedron.  You specify a root shape, then the shapes that are to be placed adjacent to it, and so on.  The shape "s" is used for the edges between adjacent shapes, and "e" is used for the outer edges.  "s" could be defined a dotted line indicating where to fold, for example.</p>
+<h2>Examples</h2>
+<p><a href="http://ejrh.files.wordpress.com/2011/01/cube.png"><img class="size-medium wp-image-51 alignright" title="Cube pattern" src="assets/cube.png?w=225" alt="" width="86" height="115" /></a></p>
+<p><a title="Cube at Wikipedia" href="http://en.wikipedia.org/wiki/Cube">Cube</a>: p4(p4 p4 p4 p4(s e p4 e))</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/01/truncated-octahedron1.png"><img class="size-medium wp-image-53 alignright" title="Truncated octahedron pattern" src="assets/truncated-octahedron1.png?w=266" alt="" width="100" height="112" /></a></p>
+<p><a title="Truncated octahedron at Wikipedia" href="http://en.wikipedia.org/wiki/Truncated_octahedron">Truncated octahedron</a> ("orange"): p4(p4 p4 p4 p4(s e p4 e))</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/01/truncated-cuboctahedron.png"><img class="size-medium wp-image-54 alignright" title="Truncated cuboctahedron pattern" src="assets/truncated-cuboctahedron.png?w=253" alt="" width="121" height="144" /></a></p>
+<p><a title="Truncated cuboctahedron at Wikipedia" href="http://en.wikipedia.org/wiki/Truncated_cuboctahedron">Truncated cuboctahedron</a>: p8(p4(s e p8(s e p4 e p4 p6)) p6 p4(s e p8(s e p4 e p4 p6)) p6 p4(s e p8(s e p4 e p4 p6)) p6 p4(s e p8(s e p4 e p4(s e p8) p6)) p6)</p>
+<h2>Improvements</h2>
+<p style="text-align:justify;">(Which I may or may not get round to...)</p>
+<p style="text-align:justify;">Clean up the language.  Functions could be parameterised, for example instead of defining a "p4" we could simply specify how many sides at interpretation time: "p(4)[p(4), p(4), p(4), p(4)[s() e() p(4) e()]".  Recursion could be supported; perhaps using a kind of let command: "(x = F()[x, x])x".  (Recursion would terminate when an Instr function determined that the scale was too small to be worth continuing; it could return an empty list of cursors to indicate this.)</p>
+<p style="text-align:justify;">Provide more embellishments for shapes.  For instance we could render pips on a die; or words; or just different coloured faces.</p>
+<p style="text-align:justify;">Output to a <a title="POV-Ray website" href="http://www.povray.org/">POV-Ray</a> source as well as SVG, so that 3D models and even animations could be made.  Imagine an animation of the polyhedron folding itself up from a flat pattern.</p>
+<p style="text-align:justify;">Provide a "t" shape so that a human scissor-wielder can leave tabs on the optimal edges for ease of construction.</p>
+<p style="text-align:justify;">The script is at <a title="Script for Pure paper packable polyhedra in Python" href="http://pastebin.com/2cExy3Rq">http://pastebin.com/2cExy3Rq</a>.</p>

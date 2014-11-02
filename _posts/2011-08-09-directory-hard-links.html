@@ -1,0 +1,64 @@
+---
+layout: post
+title: Directory hard links
+date: 2011-08-09 18:00:43.000000000 +12:00
+categories:
+- Programming
+tags:
+- file system
+- hard link
+- symlink
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-08-09
+    06:00:43";}
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Why aren't they supported in Unix?<br />
+<!--more--></p>
+<p style="text-align:justify;">A week ago I posted on my experimental <a title="Writing a file system" href="http://ejrh.wordpress.com/2011/07/29/writing-a-file-system/">file system</a> project. I mentioned that I'd implemented support for hard links to directories, but that, since they're not supported by the rest of the system, there was no way to test it! I'm pretty sure it worked anyway -- at least as much as anything else in the program. ;-) But I've had some musings on why that is.</p>
+<p style="text-align:justify;"><a title="Hard link at Wikipedia" href="http://en.wikipedia.org/wiki/Hard_link">Hard links</a> are just normal directory entries to an object. We call them "hard links" when we want to emphasise that an object can have more than one link pointing to it (i.e. more than one directory entry) and to differentiate them from symlinks (<a title="Soft link at Wikipedia" href="http://en.wikipedia.org/wiki/Soft_link">soft links</a>).</p>
+<p style="text-align:justify;">Hard links to ordinary files are allowed. Symlinks to ordinary files and to directories are allowed. Hard links to directories are not. So what are the salient differences between directories and files, or between hard links and symlinks?</p>
+<p style="text-align:justify;">The first is that hard links are implemented in the file system itself, so all traversal of them is at a very deep layer. In fact, it's exactly the same as normal traversal of a directory entry to its object, because there's no difference. A symlink, on the other hand, is really just a file containing a path, and with a special flag. Implementation of traversal can be done at a much higher level because it works the same for all file systems that support that flag. Support for them is largely implemented in the standard library rather than the operating system. And because symlinks <strong>are</strong> different from ordinary files and directories, there is an established interface and set of approaches to dealing with them in the application layer.</p>
+<p style="text-align:justify;">Part of what the standard library (or OS) does in its symlink support is count how many have been traversed in any individual file operation. There's a <a title="Symbolic links in GNU libc documentation" href="http://www.gnu.org/s/hello/manual/libc/Symbolic-Links.html">limit</a> to the number of symlinks indirections allowed. On my system there's a constant in sys/param.h that defines this:</p>
+<p>[sourcecode language="c"]#define MAXSYMLINKS 20[/sourcecode]</p>
+<p style="text-align:justify;">When a file is opened (e.g. using <code>fopen</code> or <code>opendir</code>), libc will check whether the specified path is a symlink, and if so it will read the path from it and try to open that instead. It will recursively do this up to <code>MAXSYMLINKS</code> times until it finds an ordinary file to open. It's possible to have a cycle of links. Without this limit, opening any one of them would result in iteration through them, in search of an ordinary file that isn't there.</p>
+<p style="text-align:justify;">It's possible to have a symlink pointing to its parent directory. What happens when a program like <code>find</code> recursively examines that directory? Well, by default, <code>find</code> will not follow symlinks at all. But even when the option to follow them is passed, it will record how many links it has traversed on any one branch and stop when a limit is reached. It can do this because it can distinguish between links and ordinary directories.</p>
+<p style="text-align:justify;">But what if a hard link was created to its parent directory? Each time <code>find</code> follows that link, it will treat it as just another subdirectory. It cannot tell that it points back to an ancestor. It could conceivably keep track of ancestors it has seen and avoid infinite recursion. It would need to use the <a title="Inode at Wikipedia" href="http://en.wikipedia.org/wiki/Inode">inode number</a> to identify directories, since there is no other unique characteristic. But this requires additional programming effort and runtime cost -- all to deal with the rather obscure (and administratively dubious) situation of cyclic hard links.</p>
+<table>
+<tbody>
+<tr>
+<td></td>
+<th>Symlink<br />
+(distinguishable)</th>
+<th>Hard link<br />
+(not distinguishable)</th>
+</tr>
+<tr>
+<th>File<br />
+(not recursive)</th>
+<td>Works trivially</td>
+<td>Works trivially</td>
+</tr>
+<tr>
+<th>Directory<br />
+(recursive)</th>
+<td>Works by counting traversed links</td>
+<td>Does not work as could result in infinite recursion!</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">To summarise, hard links to directories are not supported due to the conjunction of two properties:</p>
+<ol>
+<li style="text-align:justify;">Hard links cannot be distinguished from other entries.</li>
+<li style="text-align:justify;">Directories can contain other directories.</li>
+</ol>
+<p style="text-align:justify;">The absence of directory hard links means that directory traversal is guaranteed to terminate: either by the absence of links back to the parent; or, in the case where symlinks to point back to a parent, by placing a maximum on the number of links to be traversed.</p>
+<p style="text-align:justify;">And this makes programs like <code>find</code> (and numerous others that operate on directory trees) simpler and safer.</p>
+<p style="text-align:justify;"><strong>Aside.</strong> In my file system, directory links are in fact used internally. When a file or directory is moved, a hard link is created in the target directory, and the original link is removed. This is intended to be an atomic operation, so at no time can user programs arrive at the directory by more than one link.</p>

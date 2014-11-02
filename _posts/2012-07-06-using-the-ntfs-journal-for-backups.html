@@ -1,0 +1,104 @@
+---
+layout: post
+title: Using the NTFS journal for backups
+date: 2012-07-06 20:59:54.000000000 +12:00
+categories:
+- Programming
+tags:
+- backup
+- ntfs
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-07-06
+    08:59:54";}
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+  _oembed_f50919de302d529a3bb5394306bd454a: ! '{{unknown}}'
+  _oembed_a6e37efcc9e758f658562f1456386ef7: ! '{{unknown}}'
+  _oembed_2b797d5bf8340980c37454f66b003da6: ! '{{unknown}}'
+author: 
+---
+<p style="text-align:justify;"><strong>This post (in draft for almost 18 months) describes my amateur understanding of an interesting and useful NTFS feature, the USN Journal, and shows how I'm using it as part of a simple backup program in Python. It also gives some examples of how low-level Windows system calls can be made in Python, using the pywin32 modules.</strong><br />
+<!--more--></p>
+<p style="text-align:justify;">One of the many features of the NTFS file system is its optional journalling. Journalling in the context of file systems usually means writing data to a transaction log, which can be replayed in the event of a crash. (NTFS does do that, but it's referred to as the NTFS log feature.) This post addresses a different kind of journalling: that performed by the USN Journal.</p>
+<p style="text-align:justify;">The USN Journal is a log of all updates to files and directories on the volume. The purpose of it appears to be to provide an efficient way for applications, such as backup tools, to find out what changes have occurred within a given time. A USN is an Update Sequence Number: an incrementing label for each entry in the journal. A period of file system activity recorded in the journal is therefore a range between two USNs.</p>
+<p style="text-align:justify;">The journal does have some limitations, though:</p>
+<ol>
+<li style="text-align:justify;">It only records metadata changes. It will tell you if a file was opened for writing, but not whether anything was actually written to it (let alone the before and after contents of the file).</li>
+<li style="text-align:justify;">It doesn't record external data changes, such as those caused by cosmic rays, hardware failure, or meddling in the filesystem by other operating systems.</li>
+<li style="text-align:justify;">It only has limited space allocated to it. When the space is exhausted, older journal entries are lost. So, an application can use it as an optimisation, but should always provide a fallback for when the journal does not have a complete set of change data.</li>
+</ol>
+<h2>Journal API</h2>
+<p style="text-align:justify;">The journal can be manipulated via the <code>DeviceIoControl</code> system call. The <a href="http://msdn.microsoft.com/en-us/library/aa363798%28v=VS.85%29.aspx">USN Journal</a> is reasonably well documented on MSDN, as are the DeviceIoControl <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa365729%28v=vs.85%29.aspx">control codes</a> relating to it.</p>
+<p style="text-align:justify;">It's also possible to perform the manipulations in Python using the <a href="http://sourceforge.net/projects/pywin32/">Python for Windows</a> extensions. That's what I've used for my <a href="http://code.google.com/p/ejrh/source/browse/trunk/backup/">backup program</a>. The code for using DeviceIOControl to query the basic journal information in Python is, for instance:</p>
+<p>[sourcecode language="python"]import struct<br />
+import win32file<br />
+import winioctlcon</p>
+<p>def open_volume(drive):<br />
+    volh = win32file.CreateFile('\\\\.\\' + drive, win32file.GENERIC_READ,<br />
+            win32file.FILE_SHARE_READ | win32file.FILE_SHARE_WRITE, None,<br />
+            win32file.OPEN_EXISTING, win32file.FILE_ATTRIBUTE_NORMAL, None)<br />
+    return volh</p>
+<p>def close_volume(volh):<br />
+    win32file.CloseHandle(volh)</p>
+<p>def query_journal(volh):<br />
+    fmt = 'QQQQQQQ'<br />
+    len = struct.calcsize(fmt)<br />
+    buf = win32file.DeviceIoControl(volh, winioctlcon.FSCTL_QUERY_USN_JOURNAL, None, len)<br />
+    tup = struct.unpack(fmt, buf)<br />
+    return tup</p>
+<p>volh = open_volume('C:')<br />
+UsnJournalID, FirstUsn, NextUsn, LowestValidUsn, MaxUsn, MaximumSize, AllocationDelta = query_journal(volh)<br />
+close_volume(volh)<br />
+print 'Journal id is 0x%016x' % UsnJournalID<br />
+...[/sourcecode]</p>
+<p style="text-align:justify;">The format <code>QQQQQQQ</code> corresponds to the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa365721%28v=vs.85%29.aspx">USN_JOURNAL_DATA_V0</a> structure defined for use with <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa364583%28v=vs.85%29.aspx">FSCTL_QUERY_USN_JOURNAL</a>. Most journal commands have defined structures for input and output, which can be created and parsed using Python's struct module. The wrapper function <code>win32file.DeviceIoControl</code> is slightly simpler than the underlying C function, and takes arguments for the volume handle, control code, input buffer (<code>None</code> if not required), and maximum size of the output buffer. The return value is the output buffer.</p>
+<h2>Robustness of journal data</h2>
+<p style="text-align:justify;">The journal mechanism is designed to be robust, in particularly regarding the third limitation mentioned above.</p>
+<p style="text-align:justify;">USNs always increment, and journals have unique identifiers that change if the USN range overflows or the journal is recreated. Applications can use the journal id and the last processed USN to determine whether it is safe to use the journal as a complete record of changes, or whether they must process the entire file system, so that the journal can be used in future.</p>
+<p style="text-align:justify;">As an example, let's say <code>C:\Docs</code> is backed up every week. When it finishes a backup, the tool will make a note of the last USN, X, in the journal as at the time the data is backed up. Next time it is run, it replays the journal from X onward, receiving a list of files in <code>C:\Docs</code> that have changed since that time. It can then efficiently backup these files only, knowing that no regular file system activity has altered the contents of any other files.</p>
+<p style="text-align:justify;">It's possible that so much activity has occurred in the last week, that some of it is longer recorded in the journal. In this case, the earliest recorded USN in the journal will be Y &gt; X. The backup tool detects this, and enumerate the volume's complete USN data, running a full backup to be sure it has processed all potentially changed data. (It can still make other optimisations such as checking whether file contents is the same as the last backup, though.)</p>
+<p style="text-align:justify;">Enumerating USN data is done using the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa364563%28v=vs.85%29.aspx">FSCTL_ENUM_USN_DATA</a> control code. Each call to <code>DeviceIoControl</code> with this code will return a buffer of user-defined size, containing as many USN records as will fit. Repeated calls are made with the last received record's FRN, until all data has been received. USN records are in the form of the variable-length <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa365722%28v=vs.85%29.aspx">USN_RECORD_V2</a> structure.</p>
+<p style="text-align:justify;">Reading the journal normally is a similar process, but uses the <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa364586%28v=vs.85%29.aspx">FSCTL_READ_USN_JOURNAL</a> code. The USN to replay from is provided by the caller, and records are returned as with FSCTL_ENUM_USN_DATA, using the last received record's USN in subsequent calls.</p>
+<p style="text-align:justify;">The Python file <a href="http://code.google.com/p/ejrh/source/browse/trunk/backup/journalcmd.py">journalcmd.py</a> contains code for making these calls and iterating over the results.</p>
+<p style="text-align:justify;">Other potential disruptions are when so much activity has occurred that the USN values have wrapped around, or the USN Journal has been deleted and recreated on that volume. In each case, NTFS will assign a new distinct identifier to the journal. The backup tool records this value too, and if it has changed since the last backup, then the tool knows to run a full backup.</p>
+<h2>Maintaining the FRN map</h2>
+<p style="text-align:justify;">Directories pose a complication to the journal data. Each file exists in a directory, but not all actions on the file are recorded as actions on the directory (let alone its parent directories). Similarly, actions on a directory are not generally recorded as actions on all the files within it.</p>
+<p style="text-align:justify;">Directories and files are assigned unique FRNs (File Reference Numbers). An entry in the journal records the FRN and name of the affected file, as well as the FRN of the parent directory in which it occurred.</p>
+<p style="text-align:justify;">When a journal is used for the first time (as in the full backup described above), the set of directories and files on the volume is provided as a set of journal entries. But each item is described only relative to its parent. For example, the file <code>C:\Docs\Work\Projects.txt</code> will appear as a record containing FRN, parent FRN, and name values similar to:</p>
+<pre>1012 987 Projects.txt</pre>
+<p style="text-align:justify;">Where 1012 is the FRN of the file, and 987 is the FRN of its parent. To determine the full path of the file, the program must also have received records such as:</p>
+<pre>987 901 Work
+901 554 Docs
+554 219 (root directory)</pre>
+<p style="text-align:justify;">It can then trace back through the FRNs to find the full path for the item: <code>/Docs/Work/Projects.txt</code>. The advantage of separating files from their full paths is that if a directory is renamed or moved, all the files within it remain "unchanged": only the parent (and possibly its old and new parent, if it is moved) will require journal records.</p>
+<p style="text-align:justify;">If the program needs to robustly identify the full paths for items in the journal, it needs to maintain a map from FRNs to parent FRNs and names. The map should be persisted alongside the journal id and last USN. Building the map and maintaining it can be done by montoring changes to directory items.</p>
+<p style="text-align:justify;">The Python file <a href="http://code.google.com/p/ejrh/source/browse/trunk/backup/journal.py">journal.py</a> implements a <code>Journal</code> class, which encapsulates the logic for reading journals and maintaining the FRN map and journal state. It is used by the backup program for journal functionality, but can also be used as a command-line program to print paths that have changed since an earlier invocation.</p>
+<p style="text-align:justify;">Files on NTFS volumes can reside in more than one place. For instance, a hard link to an existing file can be created in the same or another directory. Currently, the backup program does not treat multiple links to the same file specially; each instance is treated as a separate file. The system call <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/aa364952%28v=vs.85%29.aspx">GetFileInformationByHandle</a> could, in principle, be used to determine whether two directory entries were the same file, and hence optimise the backup by copying only one of them.</p>
+<h2>Detecting affected files and directories</h2>
+<p style="text-align:justify;">The journal gives the program a list of changes that have occurred in the volume since it last ran. But how can the program find the actual affected files? <em>Affected</em> can have a different meaning from <em>changed</em>. For a backup tool, affected indicates whether the tool needs to fully process the item. The causal link between the two is subtle:</p>
+<ul style="text-align:justify;">
+<li>If a directory has changed, all its child files are affected.</li>
+<li>If a file has changed, all its ancestor directories are affected. (If a directory is unaffected, then it does not need to be recursively processed.)</li>
+</ul>
+<p style="text-align:justify;">For example, the first rule says that if <code>/Docs/Work</code> is renamed to <code>/Docs/Business</code>, then, even though there is no change to <code>/Docs/Business/Projects.txt</code>, it should still be backed up.</p>
+<p style="text-align:justify;">As an example of the second rule, if <code>/Docs/Work/Projects.txt</code> is changed, then the backup tool must recursively process <code>/Docs</code> and <code>/Docs/Work</code> to eventually back it up. If none of the files under <code>/Docs</code> were changed, then the backup tool could backup <code>/Docs</code> in a more efficient way, such as by making a symlink to the previous backup.</p>
+<p style="text-align:justify;">The symmetry of these two rules, combined with the fact that it's easier to look up a path's ancestors than its children, suggests an implementation where changed files and affected directories are maintained when the journal is processed. Then a directory of the volume can be scanned for affected files and directories relatively efficiently. This is the approach taken in journal.py.</p>
+<p style="text-align:justify;">The basic algorithm for backing up a source directory is then:</p>
+<pre>Open the journal, creating a Journal class.
+Update the journal from NTFS, populating its affected file data.
+Back up the source directory.
+Close the journal, persisting its new state to disk for next time.</pre>
+<p style="text-align:justify;">To back up a directory:</p>
+<pre>Is the directory affected according to the journal?  (A new journal marks everything as affected).
+If no, then create a symlink (or junction point, in Windows) to the previous backed up version of the directory.
+Otherwise, back up each item in it recursively.</pre>
+<p style="text-align:justify;">To back up a file:</p>
+<pre>Is the file affected according to the journal?
+If no, create a hard link to the previous backed up version of the file.
+Otherwise, copy it.</pre>
+<p style="text-align:justify;">(The script also tries to reuse similar files, by keeping a manifest of all files with their checksums. But this is separate from its journal use.) In a future post I'll show how to create Windows hard links, symlinks, and reparse points with Python.</p>

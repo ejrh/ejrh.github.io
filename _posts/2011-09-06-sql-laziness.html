@@ -1,0 +1,39 @@
+---
+layout: post
+title: SQL laziness
+date: 2011-09-06 18:33:18.000000000 +12:00
+categories:
+- Programming
+- Rants
+tags:
+- sql
+- sybase
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wp_old_slug: '1046'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-09-06
+    06:36:45";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">A small, but cathartic, rant on what's irritating me today.<br />
+<!--more--></p>
+<p style="text-align:justify;">I've been working on an SQL statement. It's a join over several tables, with some additional filter conditions. Here's what it looks like, approximately and obfuscatedly:</p>
+<p>[sourcecode language="sql"]SELECT DISTINCT context_vertex_name, context_form_value AS port, ...<br />
+FROM context_info i, context c, context_vertex_form vf, context_form f, ...<br />
+WHERE i.context_id = c.context_id<br />
+AND i.context_name = &quot;FOO&quot;<br />
+AND c.context_vertex_name = &quot;BAR&quot;<br />
+AND vf.context_vertex_id = c.context_vertex_id<br />
+AND vf.context_form_id = f.context_form_id<br />
+AND ...<br />
+GROUP BY ...[/sourcecode]</p>
+<p style="text-align:justify;">There are several annoyances in that. The first is that it uses the non-standard double quote delimiter for strings. I often see this in the <a title="Sybase at Wikipedia" href="http://en.wikipedia.org/wiki/Adaptive_Server_Enterprise">Sybase</a>-dominated work environment. Double quote is supposed to delimit identifiers, not strings! It's useful when you want to use certain characters in a name, for example <code>SELECT EXTRACT(year, NOW() - date_of_birth) AS "Age in Years", ...</code>, or when some helpful DBA has given you table and column names with certain characters in them that you need to safely reference. It also controls the case-folding policy in SQL (when the DBA has helpfully used mixed case identifiers).</p>
+<p style="text-align:justify;">Next is an old one that is unfortunately allowed by the standard. The "AS" keywords are omitted in FROM-clause. The table names and their aliases are separated only by a single space character, which is only slightly distinguishable from the underscores in tables names. Even syntax highlighting won't help here, because both tokens are of the same type in the grammar and have the same format. It's not ambiguous, but it's a pain to read especially in a big query. Whose idea was it to make AS optional? (It's not optional for column aliases in the SELECT-clause; the standards committee must have been firing on all cylinders the day they wrote that part.) It's rather uncommon to see constructions of the form "name name" in formal languages; the only exception I can think of is lambda calculus and other functional languages (such as <a title="Haskell at Wikipedia" href="http://en.wikipedia.org/wiki/Haskell_%28programming_language%29">Haskell</a>) in which a function call is the application of two terms, e.g. "f x" or "first 5 primes" (where <a title="Currying at Wikipedia" href="http://en.wikipedia.org/wiki/Currying">currying</a> allows us to treat all functions as taking one argument).</p>
+<p style="text-align:justify;">Finally, and worst of all, the joins are all implicit! That means, there is a simple list of tables, then additional criteria in the WHERE-clause to filter their cartesian product. There's not much difference performance-wise between implicit and explicit joins. The optimiser will normally decompose the ON-clauses of explicit joins into the WHERE-clause, and then re-extract useful join criteria from the WHERE-clause when planning how to scan the tables. But there is useful semantic information in distinguishing between join criteria and filter criteria -- useful to a human reader who's trying to understand the query. When you have dozens of criteria, dividing them into those that preserve relational meaningfulness, and those that merely control the subset of results returned, really helps to both comprehend what the intent of the query is, and to alter it to achieve that. Having those criteria mixed in together in one giant WHERE-clause does not.</p>
+<p style="text-align:justify;">I blame these persistent habits largely on the DBMS we use. It's so old and nonstandard that people will use whatever works to get the job done. And it's so ubiquitous in the environment -- in cahoots with its barely-evolved offspring, <a title="Microsoft SQL Server at Wikipedia" href="http://en.wikipedia.org/wiki/Microsoft_SQL_Server">MS SQL Server</a>; don't get me started on the evils of <a title="The evil Transact-SQL at Wikipedia" href="http://en.wikipedia.org/wiki/Transact-SQL">T-SQL</a>! -- that people don't realise there is a large, established world of (more-or-less-)standards-compliant, well-factored, SQL practice out there.</p>

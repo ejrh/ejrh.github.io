@@ -1,0 +1,145 @@
+---
+layout: post
+title: Massively parallel fractals
+date: 2012-01-04 00:00:00.000000000 +13:00
+categories:
+- Programming
+tags:
+- c
+- fractal
+- gpu
+- opencl
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-01-03
+    11:06:32";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">I've implemented a mode in the fractal program that lets it run on a GPU, using <a title="OpenCL at Wikipedia" href="http://en.wikipedia.org/wiki/OpenCL">OpenCL</a> (fixes <a title="&quot;Offload fractal rendering to the GPU, with OpenCL&quot; in EJRH issue tracker" href="http://code.google.com/p/ejrh/issues/detail?id=19">issue 19</a>!). It's not yet very fast, but IMHO is a good start. Writing my first GPU program was actually quite a challenge.<br />
+<!--more--></p>
+<p style="text-align:justify;">While discussing earlier fractal work such as that on <a title="Low-level priority queue optimisations" href="http://ejrh.wordpress.com/2011/10/15/low-level-priority-queue-optimisations/">using SIMD with the TRACE mode</a>, I speculated that one day there would be a mode that computes hundreds of pixels in parallel on a "many-core" GPU. Surprisingly, that day has finally come! To be honest, I wasn't seriously expecting to reach it when I talked about it as future work.</p>
+<h2 style="text-align:justify;">Porting libstdcl</h2>
+<p style="text-align:justify;">I started a couple of months ago by downloading the <a title="AMD APP SDK" href="http://developer.amd.com/sdks/amdappsdk/pages/default.aspx">AMD APP</a> SDK (their version of OpenCL), and something called <a title="libsdlcl by Brown Deer Technology" href="http://www.browndeertechnology.com/coprthr_stdcl.htm">libstdcl</a>. The latter is a library that wraps the OpenCL API in something slightly friendlier, for C. Now, libstdcl seems to be designed for 64-bit, when compiled on Windows at any rate. But fractal is a 32-bit program. And, as I discovered, the free version of MS Visual C doesn't support 64-bit.</p>
+<p style="text-align:justify;">So my first task was porting libstdcl to 32-bit Windows. To forestall any awe-filled reactions to that, I'll point out that this entailed nothing more than:</p>
+<ul>
+<li style="text-align:justify;">Making it detect Windows in 32-bit mode, by universally changing <code>#ifdef _WIN64</code> to <code>#if defined(_WIN64) || defined(WIN32)</code>. I also took a quick glance (about 30 seconds' worth) at the Windows code to check it will work in 32-bit mode too.</li>
+<li style="text-align:justify;">Rewriting the C code to put all declarations at the top of a block. No real thought required, but lots of genuine irritation resulting. Why does MS Visual C 2010 still not support C99 D:.</li>
+<li style="text-align:justify;">Deciphering some of the clever (and unsupported by MSVC) macro tricks used to set kernel parameters.</li>
+</ul>
+<p style="text-align:justify;">Very little comprehension of the libstdcl code (and less of the OpenCL API) was required. Once the library was compiled, it was a similar but smaller task to port one of the example programs. I chose hello_stdcl, which appeared to run successfully. At least I'm guessing so, since I don't know precisely what it was computing. It ran without complaining and output lots of stuff; I assume it's correct.</p>
+<h2>An OpenCL mfunc kernel</h2>
+<p style="text-align:justify;">The next challenge was translating the fractal calculations into something runnable on a GPU. Recall the direct "mfunc" routine from fractal:</p>
+<p>[sourcecode language="c"]int mfunc_direct(double zx, double zy, double cx, double cy, int max_iterations, double *fx, double *fy)<br />
+{<br />
+    int i = 0;<br />
+    double zr = zx, zi = zy;<br />
+    double zr2 = 0.0, zi2 = 0.0;</p>
+<p>    while (i &lt; max_iterations &amp;&amp; zr2 + zi2 &lt; 2.0*2.0)<br />
+    {<br />
+        double t;</p>
+<p>        zr2 = zr*zr;<br />
+        zi2 = zi*zi;<br />
+        t = zr*zi;<br />
+        zr = zr2 - zi2 + cx;<br />
+        zi = t + t + cy;</p>
+<p>        i++;<br />
+    }<br />
+    *fx = zr;<br />
+    *fy = zi;</p>
+<p>    if (zr2 + zi2 &lt; 2.0*2.0)<br />
+        return 0;</p>
+<p>    return i;<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">The goal is to write a similar function -- a <em>kernel</em> -- that can be applied to many pixels in parallel. The main problem is that different pixels take different amounts of work to compute; this translates to different numbers of iterations until the exit condition is reached.</p>
+<p style="text-align:justify;">I tackled this earlier in the PARALLEL mode, by having each thread do a number of pixels evenly distributed across the drawing. The total work for each thread should therefore be similar.</p>
+<p style="text-align:justify;">The same technique is used here, except that only several thousands pixels are worked on at a time. There are 64 threads, and each thread <var>i</var> works on pixels 64<var>j</var> + <var>i</var> for all <var>k</var> within range.</p>
+<p style="text-align:justify;">The inputs to each calculation are four coordinate values <code>(zx, xy, cx, cy)</code>, and the outputs are the depth <code>v</code> at that coordinate, and the final point <code>(fx, fy)</code> resulting from the calculation. Since a kernel will work on many pixels, it takes as input arrays of all the inputs, and stores its output in arrays too. The first draft kernel is:</p>
+<p>[sourcecode language="c"]__kernel void mfunc_kern(<br />
+    /* Work size: number of threads and total number of pixels. */<br />
+    uint n,<br />
+    uint w,</p>
+<p>    /* Input coordinates. */<br />
+    __global float *gzx,<br />
+    __global float *gzy,<br />
+    __global float *gcx,<br />
+    __global float *gcy,</p>
+<p>    /* Outputs. */<br />
+    __global unsigned short *vs,<br />
+    __global float *fx,<br />
+    __global float *fy,</p>
+<p>    /* Maximum depth to search to. */<br />
+    uint depth,<br />
+)<br />
+{<br />
+    int i = get_global_id(0);<br />
+    int j = i;<br />
+    while (j &lt; w)<br />
+    {<br />
+        /* Do mfunc on the pixel at j. */</p>
+<p>        /* Move coordinates into local variables. */<br />
+        float zr = gzx[j];<br />
+        float zi = gzy[j];<br />
+        float zr2 = 0.0f;<br />
+        float zi2 = 0.0f;<br />
+        float cr = gcx[j];<br />
+        float ci = gcy[j];</p>
+<p>        /* Remaining depth to search up to. */<br />
+        int remaining = depth;</p>
+<p>        /* Iterate until depth exhausted or point escapes set. */<br />
+        while (remaining &amp;&amp; zr2 + zi2 &lt; 4.0f)<br />
+        {<br />
+            float t;</p>
+<p>            zr2 = zr*zr;<br />
+            zi2 = zi*zi;<br />
+            t = zr*zi;<br />
+            zr = zr2 - zi2 + cr;<br />
+            zi = 2.0f * t + ci;</p>
+<p>            remaining--;<br />
+        }</p>
+<p>        /* Store final point. */<br />
+        fx[j] = zr;<br />
+        fy[j] = zi;</p>
+<p>        /* Store depth at point, depending on whether it has escaped. */<br />
+        if (zr2 + zi2 &lt; 4.0f)<br />
+            vs[j] = 0;<br />
+        else<br />
+            vs[j] = remaining;</p>
+<p>        /* Next pixel. */<br />
+        j += n;<br />
+    }<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">This renders an image indistinguishable from the ones generated on the CPU. A very satisfying result to mark the new year. Get it right first, then make it fast.</p>
+<h2>...that is far from perfect</h2>
+<p style="text-align:justify;">Unfortunately it takes longer to do so than the parallelism-challenged CPU; even the SIMPLE mode with no SIMD can be faster, and the PARALLEL mode with SIMD_FLOAT is many times faster; that mode does up to 24 pixels in parallel on my six-core CPU. But the GPU should be doing up to 224 if I've read my GPU's <a title="Radeon HD6870 specs" href="http://www.amd.com/us/products/desktop/graphics/amd-radeon-hd-6000/hd-6870/pages/amd-radeon-hd-6870-overview.aspx#2">specs</a> right. (It has that many stream processors. Ideally I would also use SIMD on the GPU, making use of each stream processor's 4 processing elements, to reach 1120 simultaneous pixels.)</p>
+<p style="text-align:justify;">Is each pixel computation more than 10 times slower on the GPU? Unlikely. I don't know the relative scalar speeds on GPUs vs CPUs (it could easily be benchmarked) but I doubt it's that much. And there are more obvious performance effects to consider first.</p>
+<p style="text-align:justify;">The first is that there is some overhead in marshalling the data and dispatching a computation to the GPU. This was especially evident when the program did a single row at a time. It was painfully slow, and just as slow on the deep parts as the shallow parts, indicating that the cost of the individual kernel iterations was not accounting for a significant part of the total cost. The speed was dramatically improved by doing 25 rows at a time.</p>
+<p style="text-align:justify;">The next symptom is that the OpenCL compiler will actually give a warning (not printed by default, in libstdcl), saying:</p>
+<blockquote><p>mfunc_kern kernel has register spilling. Lower performance expected.</p></blockquote>
+<p style="text-align:justify;">This means that there are so many variables in use in the kernel that some of them are stored in "local memory", which apparently is not very local to the stream processor that needs to use it. Some ways around this might be to combine the 4 input arrays into a single array. Using an array of 4-float vectors might help too, though the computations on them won't be vectorised.</p>
+<p style="text-align:justify;">The big performance impact is the branchiness of the kernel code. Each compute unit on the GPU has 16 stream processors. But in order to run each in parallel, it needs to run them in lock step: the same instruction in the kernel is executed simultaneously on each, using the data elements belonging to that processor. If execution reaches a branch, such as the if-statement on line 57, then all threads should branch the same way. That way they can continue in lockstep.</p>
+<p style="text-align:justify;">If they do not, then the GPU will cope by running some of the threads only, then the remaining threads only, until the two branches join. This is slower than running them all in parallel. There are coding techniques that can remove branches, by executing both branches but masking out any changes to destination variables. That branch could be rewritten as:</p>
+<p>[sourcecode language="c"]    /* Set to remaining*1 if condition is true, or remaining*0 if it's false. */<br />
+    vs[j] = remaining * (zr2 + zi2 &gt;= 4.0f);[/sourcecode]</p>
+<p style="text-align:justify;">(For what it's worth, that if-statement could easily be moved out into the main program and run on the CPU. That removes any benefits it might receive from massive parallelism, of course. But that could be worthwhile if it no longer encumbers the more expensive iteration part of the kernel.)</p>
+<p style="text-align:justify;">It's not clear what happens in the case of a while loop though. What if some of the threads exit the inner loop, but others continue in it? What then happens if some of those remaining ones later exit? Will the threads devolve into none of them being in lockstep, and effectively have to be individually executed one after the other?</p>
+<p style="text-align:justify;">It can be hard to peer through the layers of libraries, drivers and multiple devices to see exactly how my code is being executed. I'm still a novice at these things, having only been GPU programming for two days.</p>
+<p style="text-align:justify;">There are large programming guides, such as the <a title="NVIDIA OpenCL Programming Guide (pdf)" href="http://developer.download.nvidia.com/compute/cuda/3_1/toolkit/docs/NVIDIA_OpenCL_ProgrammingGuide.pdf">nVidia CUDA</a> one and the <a title="AMD Accelerated Parallel Processing OpenCL Programming Guide (pdf)" href="http://developer.amd.com/sdks/AMDAPPSDK/assets/AMD_Accelerated_Parallel_Processing_OpenCL_Programming_Guide.pdf">AMD APP</a> one; from what I've read so far the underlying architectures, and hence good programming heuristics, are similar enough to make them both potentially useful. There are also some tools such as a Kernel Analyser that comes with the AMD SDK; it prints the Radeon assembly code that the kernel compiles to (which I've not completely understood yet; it's not like CPU assembly code).</p>
+<p style="text-align:justify;">I suspect that the mfunc kernel will benefit from removing some of its branches. One way of handling the differing iteration lengths for pixels is to have the escape/exhaustion condition handled as an if-statement inside an infinite loop, as it was in the SIMD code. That way the GPU might have an easier time of recognising that it was a small bit of extra code to run for a few pixels, and that normal lockstep computation could continue after it.</p>
+<p style="text-align:justify;">Another possibility is to compute the same number of iterations for all pixels, explicitly masking out the effects for any pixels that were complete. This could be done in batches: do (say) 32 iterations for all pixels, then another 32 for those that are still going, and so on, until all are done. (This is a little like the ITERATIVE mode, which seeks to resume pixels that were not finished in a previous iteration.)</p>
+<p style="text-align:justify;">Last of all, there is a potential speedup from using SIMD on the GPU. This raises the possibility of a full set of GPU-specific mfunc modes. The current mode uses single-precision floats; double precision should be supported on some GPUs.</p>
+<h2>Ramifications on other modes</h2>
+<p style="text-align:justify;">To finish, we could unify the OpenCL implementation with the other drawing modes. Currently it's SIMPLE_OPENCL; it's essentially SIMPLE mode (drawing row by row from the top). But there is no reason why the large number of pixels it works on should be a contiguous group. The OpenCL computation is more similar to an mfunc mode than a drawing mode: it takes a large number of input coordinates, works on them in parallel, and returns a large number of pixel results.</p>
+<p style="text-align:justify;">Making the OpenCL computation generic like this brings the program full circle again. We have several drawing modes: SIMPLE, PARALLEL, TRACE, etc. Orthogonal to these are several mfunc modes: FLOAT, SIMD, SIMD_FLOAT, OPENCL, OPENCL_SIMD, etc. But within the mfunc modes are several more orthogonal variations:</p>
+<ul>
+<li>Scalar or SIMD?</li>
+<li>Integer, float, or double precision?</li>
+<li>CPU or GPU (or both!) ?</li>
+</ul>
+<p style="text-align:justify;">After covering all those, it might finally be time to start making the program actually useable. ;-)</p>
+<p style="text-align:justify;">

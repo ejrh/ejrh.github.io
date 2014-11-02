@@ -1,0 +1,33 @@
+---
+layout: post
+title: A small contribution to PostgreSQL beta testing
+date: 2012-06-16 15:14:17.000000000 +12:00
+categories:
+- Programming
+tags:
+- postgresql
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-06-16
+    03:14:17";}
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+author: 
+---
+<p style="text-align:justify;">PostgreSQL 9.2 has been in beta for a few weeks, and (since they <a title="PostgreSQL 9.2 beta announcement" href="http://www.postgresql.org/about/news/1395/">asked for volunteers</a>) I thought I'd do a bit of informal testing. I'm also eager to see the effects of <a title="Index-only scans in the PostgreSQL development wiki" href="http://wiki.postgresql.org/wiki/Index-only_scans">Index-only scans</a> and other performance improvements (which I'll report on when I get round to investigating them properly).<br />
+<!--more--></p>
+<p style="text-align:justify;">I did not expect to find anything, but as I'm one of the few people in the world who run PostgreSQL on Windows XP, it was possible that my testing would help out in an area not much covered by the other testers. So far, I've reported four bugs:</p>
+<ol style="text-align:justify;">
+<li>pg_upgrade - can't pipe to the same log file from two different processes. Windows heavily locks files by default when opening them, even when piping to them.</li>
+<li>XML support - the wrong libxml2.dll appears to have been included in the Windows package. But it's the right libxml2 for other XML-related functionality! Ah, <a title="DLL Hell at Wikipedia" href="http://en.wikipedia.org/wiki/DLL_Hell">DLL Hell</a> is still with us in 2012. This is just a building and packaging issue, not a bug in the code.</li>
+<li>pg_ctl - crashes when no DATADIR specified, instead of printing an error.</li>
+<li>pg_ctl - potential failure due to forking postgres.exe as an admin user. The main PostgresSQL program refuses to run under an admin account for security reasons -- it's a server, so the less unnecessary power it has in the system if it's ever compromised, the better.  Programs like pg_ctl.exe will try to fork it without privileges; but some new code calls it (using popen) without doing this.  This one's still in discussion; postgres.exe is only called in this case to retrieve a config value, so it should be relatively safe to let it run in admin mode (as it already does for handling the --help and --version commands).  On the other hand, postgres.exe, is the most important and complex piece of the entire system, so special cases in its code shouldn't be added without good reason.</li>
+</ol>
+<p style="text-align:justify;">None of this makes me think any less of PostgreSQL as a reliable system. I've been using it since 8.0 at work and home, and I have never seen a new version introduce problems. The difference this time is that I've been testing a beta.</p>
+<p style="text-align:justify;">It's very satisfying to send a bug report and get a polite reception for it. It's even more satisfying when it actually helps them to improve the product. The PostgreSQL developers read hundreds of emails a day about their project, so there are clear guidelines about what bug reports should contain. I tried making mine as helpful as possible. The first response I got to the full report was "First: Best. Bug. Report. Ever." which is encouraging. ;-)</p>
+<p style="text-align:justify;">It's also impressive to see the development process. People who are among the most expert and productive programmers on the planet have carefully read my bug reports, politely asked a few further questions, corrected (or even agreed with) my speculative diagnosis, sent fixed versions for me to test, and thanked <em>me</em> for my contributions.</p>
+<p style="text-align:justify;">And these are four tiny bugs that only affect Windows (not the Unix servers PostgreSQL usually runs on); a few percent of the bugs that will be ironed out in this release, which account for a fraction of the development work that has been done for 9.2. I am in no doubt that they would have been picked up by others before 9.2 is officially released.</p>
+<p style="text-align:justify;">So, a bit of beta testing has arguably been my biggest contribution to free software to date. Imagine how it would feel to actually write code for something that millions of other people benefit from every day. Something to aim for in the future?</p>

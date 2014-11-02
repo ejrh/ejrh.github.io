@@ -1,0 +1,92 @@
+---
+layout: post
+title: XML in the database
+date: 2012-04-23 19:53:45.000000000 +12:00
+categories:
+- Programming
+tags:
+- postgresql
+- xml
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-04-23
+    07:53:45";}
+  _wpas_done_linkedin: '1'
+  sharing_disabled: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">At work we often need to analyse large sets of XML files. We have a standard <a title="eXtensible Markup Language at Wikipedia" href="en.wikipedia.org/wiki/XML">XML</a> format that is used for a lot of the data interchange. Each message describes the state of a complex data object at a point in time. When objects are altered in a source system, update messages are generated and propagated to downstream systems.</p>
+<p style="text-align:justify;">I've been working on an understanding an issue with one of these systems, and one of the approaches is to examine the data received. Luckily, it keeps a record of every XML message received.</p>
+<p style="text-align:justify;">From the start of the year until now, 272379 messages have been received and processed by the system. The average message size is 274 kB; hence, the total size of data processed, and which I intend to analyse, is 71 GB. gzip compresses to a 2327 MB file.</p>
+<p style="text-align:justify;">Now, there are specialised "document oriented" databases that are designed to store and manipulate vast quantities of structured data. But a surprisingly good alternative is a plain old relational database like <a title="PostgreSQL at Wikipedia" href="en.wikipedia.org/wiki/PostgreSQL">PostgreSQL</a>.<br />
+<!--more--></p>
+<p style="text-align:justify;">The messages are loaded into a simple table:</p>
+<p>[sourcecode language="sql"]CREATE TABLE message<br />
+(<br />
+    id SERIAL PRIMARY KEY,<br />
+    filename VARCHAR NOT NULL UNIQUE,<br />
+    content xml NOT NULL<br />
+);[/sourcecode]</p>
+<p style="text-align:justify;">The first great thing about PostgreSQL is that it will automatically compress large pieces of data. In this case, the 71 GB is stored in a table of size 3856 MB (including the TOASTed data). Admittedly, this is much larger than the gzip compressed file. gzip has the advantage there in that all the data is concatenated, so compression can operate effectively over the many strings which recur throughout the whole set. Additionally, gzip has almost no overhead. PostgreSQL maintains overhead to index each message, and to locate each piece of data, as well as the DB overhead required to support standard <a title="Atomicity, Consistency, Isolation, and Durability at Wikipedia" href="http://en.wikipedia.org/wiki/ACID">ACID</a> properties.</p>
+<p style="text-align:justify;">But on the other hand, the data in PostgreSQL can be indexed. Firstly, we can already select any set of messages by unique id or filename, since those indexes exist. If there are other elements in the XML data we're interested in, we can extract them into a summary table.</p>
+<p>[sourcecode language="sql"]CREATE TABLE trade_summary<br />
+(<br />
+    id INTEGER PRIMARY KEY REFERENCES message(id),<br />
+    source_system VARCHAR,<br />
+    trade_id VARCHAR,<br />
+    product_type VARCHAR<br />
+);</p>
+<p>INSERT INTO trade_summary (id, source_system, trade_id, product_type)<br />
+SELECT<br />
+    id,<br />
+    (gxp('//g:trade/g:sourceSystem/text()', content)::TEXT[])[1],<br />
+    (gxp('//g:trade/g:tradeId/text()', content)::TEXT[])[1],<br />
+    (gxp('//g:trade/g:productType/text()', content)::TEXT[])[1]<br />
+FROM message<br />
+WHERE id NOT IN (SELECT id FROM trade_summary);[/sourcecode]</p>
+<p style="text-align:justify;">This populates the summary table with three XML fields, selected by <a title="XML Path Language at Wikipedia" href="http://en.wikipedia.org/wiki/XPath">XPath</a>s. The function returns an array of XML values, and we take the first element. In some cases we may want to extract more than one matching value from a message. Note that <code>gxp</code> is a helper function that calls PostgreSQL's built-in <code>xpath</code> function with the appropriate namespaces for our data:</p>
+<p>[sourcecode language="sql"]CREATE FUNCTION gxp(TEXT, xml) RETURNS xml[] IMMUTABLE LANGUAGE 'sql'<br />
+AS $$<br />
+   SELECT xpath($1, $2, '{{g,http://example.com/work/schemas/gformat}}'::TEXT[]);<br />
+$$;[/sourcecode]</p>
+<p style="text-align:justify;">This saves on typing when using XPaths.  Small helper functions like this are also efficient: the function is marked IMMUTABLE and PostgreSQL is able to inline it into any query in which it's used.</p>
+<p style="text-align:justify;">Populating the table the first time is expensive. This is generally acceptable as the messages do not change once they enter the DB, and hence the summary of a message does not either. To keep it up to date for new data, we could have a batch query that updates it as above, filtered only on messages not yet in the summary table. This can be run manually from time to time. Or we can define a trigger for it:</p>
+<p>[sourcecode language="sql"]CREATE FUNCTION update_trade_summaries() RETURNS TRIGGER<br />
+VOLATILE LANGUAGE 'sql' AS<br />
+$$<br />
+    /* the insert query */<br />
+$$;</p>
+<p>CREATE TRIGGER trade_summary_update AFTER INSERT ON message<br />
+FOR EACH STATEMENT<br />
+EXECUTE PROCEDURE update_trade_summaries();[/sourcecode]</p>
+<p style="text-align:justify;">The summary table contains the message properties of interest, in a normalised and more compact form. Indexes can be added to the columns, and analytical queries on these properties will be much more efficient than using XPath or other XML processing technologies on the full, 71 GB data set. Even if additional properties from the message are needed for an analysis, the ones in the summary table can provide an efficient way to filter the messages before analysing them at the XML level.</p>
+<p style="text-align:justify;">It's also possible to summarise multi-valued fields.</p>
+<p>[sourcecode language="sql"]ALTER TABLE trade_summary ADD parties TEXT[];</p>
+<p>UPDATE trade_summary SET parties = gxp('//g:trade/g:parties/g:partyName/text()', content)::TEXT[] FROM message WHERE message.id = trade_summary.id;</p>
+<p>CREATE INDEX ON trade_summary USING GIN (parties _text_ops);[/sourcecode]</p>
+<p style="text-align:justify;">Each value in the column <code>parties</code> is a list of party names from the trade message. The last line above has created a special index -- using the PostgreSQL <a title="Generalised Inverted Index in PostgreSQL" href="http://www.postgresql.org/docs/current/interactive/gin.html">Generalised Inverted Index</a> functionality -- that enables searches for all rows that include at least one named party.</p>
+<p>[sourcecode language="sql"]EXPLAIN ANALYZE SELECT * FROM trade_summary WHERE '{ACME}' @&gt; parties;</p>
+<p>                                                             QUERY PLAN<br />
+-------------------------------------------------------------------------------------------------------------------------------------<br />
+ Bitmap Heap Scan on trade_summary  (cost=12.01..16.02 rows=1 width=105) (actual time=0.071..0.178 rows=77 loops=1)<br />
+   Recheck Cond: ('{&quot;ACME&quot;}'::text[] @&gt; parties)<br />
+   -&gt;  Bitmap Index Scan on trade_summary_parties_idx  (cost=0.00..12.01 rows=1 width=0) (actual time=0.054..0.054 rows=156 loops=1)<br />
+         Index Cond: ('{&quot;ACME&quot;}'::text[] @&gt; parties)<br />
+ Total runtime: 0.225 ms<br />
+(5 rows)[/sourcecode]</p>
+<p style="text-align:justify;">Finally, there is one more trick. We don't have to move all the interesting features of each message into a summary table. We can create an XPath index directly on the message table:</p>
+<p>[sourcecode language="sql"]CREATE INDEX ON message (((gxp('//g:tradeValue/text()', content)::TEXT[])[1]::DOUBLE PRECISION));</p>
+<p>EXPLAIN ANALYZE SELECT * FROM message WHERE ((gxp('//g:tradeValue/text()', content)::TEXT[])[1]::DOUBLE PRECISION) &gt; 1000000;</p>
+<p>                                                                                           QUERY PLAN<br />
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------<br />
+ Index Scan using message_gxp_idx on message  (cost=0.01..81.57 rows=33 width=91) (actual time=0.050..0.079 rows=27 loops=1)<br />
+   Index Cond: ((((xpath('//g:tradeValue/text()'::text, content, '{{g,http://example.com/work/schemas/gformat}}'::text[]))::text[])[1])::double precision &gt; 1000000::double precision)<br />
+ Total runtime: 0.110 ms<br />
+(3 rows)[/sourcecode]</p>
+<p style="text-align:justify;">Admittedly, it is verbose. But the advantage of specifying it in the database is it can be defined once, abstracted away behind a view, and then efficiently queried with ease.</p>
+<p style="text-align:justify;">I would not be surprised if the same functionality with a stronger focus on XML was available in more specialised databases. But PostgreSQL is a fully featured general purpose DBMS. Perhaps your analysis will grow to involve large sets of normalised data, or have part of it run in a database where data is possibly being changed by other users. If and when that happens, you will have the full power of an SQL system at your disposal.</p>

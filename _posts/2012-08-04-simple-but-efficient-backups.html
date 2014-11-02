@@ -1,0 +1,66 @@
+---
+layout: post
+title: Simple but efficient backups
+date: 2012-08-04 15:26:11.000000000 +12:00
+categories:
+- Programming
+tags:
+- backup
+- ntfs
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";i:0;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-08-04
+    03:26:57";}
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+author: 
+---
+<p style="text-align:justify;">Backups are <a title="World Backup Day" href="http://ejrh.wordpress.com/2011/04/01/world-backup-day/">perennially</a> on my To-do list. Just having them would be good, but more than that I want to automate their creation and maintenance.</p>
+<p style="text-align:justify;">My problem, of course, is I prefer to make my own system for doing this rather than use someone else's. This doesn't always work out. One of my early attempts was coming along great, and I decided to test it -- on its own source directory. It was soon apparent that I had transposed the <span style="text-decoration:underline;">from</span> and <span style="text-decoration:underline;">to</span> arguments to the copy function, as the backup program's source files had all been truncated to zero length. Karmic neatness aside, there is a lesson there: <strong>always make a good backup before testing a backup program for the first time</strong>.<!--more--></p>
+<p style="text-align:justify;">After talking with Kris about <a title="Kris's blog post about &quot;Time Machine for Unix&quot;" href="http://www.punk.co.nz/2010/11/30/time-machine-for-unix/">his script for backups</a> in Unix, I started investigating whether a similar job could be done on Windows with NTFS. The reason is not so much that I want to learn the Windows API, though there is no harm in that (in moderation, at least <code>;-)</code>). The real problem is that I use Linux and Windows approximately equally at home, with files scattered over both OSs and three or more machines. I want a backup system that consistently looks after all my files.</p>
+<p style="text-align:justify;">My requirements are pretty basic:</p>
+<ol style="text-align:justify;">
+<li>Run from the command line.</li>
+<li>Make simple copies of files, reflecting the original directory structure.</li>
+<li>Try to reuse files from earlier backups if they are unchanged.</li>
+</ol>
+<p style="text-align:justify;">So over the last 18 months I've been gradually completing the python program that I'd salvaged from email. As at this point it basically meets the above requirements (notwithstanding bugs, design flaws and the occasional cosmic ray). I'd originally written it for Windows, using the win32 extensions to <a title="Using the NTFS journal for backups" href="http://ejrh.wordpress.com/2012/07/06/using-the-ntfs-journal-for-backups/">read the USN Journal</a> and create links to existing items. It now works in Unix too (except for the Journal functionality).</p>
+<p style="text-align:justify;">Links in Unix are easy, because the system calls are in the standard library (<code>link</code> and <code>symlink</code>) and there is a well-known and easy to use command line program () for creating them.</p>
+<p style="text-align:justify;">Links in Windows have been struggling to crawl out of the primordial soup, from non-existent, to a hack, to an afterthought, to an experts-only feature, to something that's slightly tricky to use but mostly works like it does on Unix except not quite. NTFS is a curiously powerful file system and supports a lot of things which Windows itself has not always exposed. Hard links are one example. Junction points are another. An entry in a directory does not have to point to a file or other directory; it can contain special instructions to tell NTFS to do something else instead when it is accessed. In practice the most obvious junction point action has been to operate as a symlink.</p>
+<p style="text-align:justify;">Junction points could be used in Windows XP at least, and actual symlinks themselves were added more recently. As of Windows 7, there is a <code>mklink</code> command which can create hardlinks, symlinks, and directory junction points. Historically there was a serious danger with the use of junction points as symlinks, because the rest of Windows transparently treated them as directories: this is great when you want to access their contents. But not so great when you delete a symlink, and find that Windows Explorer has dutifully deleted everything in the directory that the link pointed to.</p>
+<p style="text-align:justify;">I have run a quick test and discovered that both junction points and symlinks will not be recursively deleted by Windows Explorer, so using links is almost complete in Windows now. The one outstanding weakness is likely to be that programs for Windows may operate on the assumption that all directories are directories and hence perform recursive operations on symlinked directories that may be inconsistent with the idea that the same sets of contents may be accessed via a symlink.</p>
+<p style="text-align:justify;">My backup program is still very unpolished, but it can be used like this:</p>
+<pre>backup.py C:\games H:\backup\games 20120804</pre>
+<p style="text-align:justify;">This will create a copy of C:\games at H:\backup\games\20120804. If other backups created by the program exist in H:\backup\games, their data will be reused where possible.</p>
+<p style="text-align:justify;">The algorithm is simple:</p>
+<ol style="text-align:justify;">
+<li>Read from the command line a Source directory, a Target directory, and a Name for the backup within the target (typically the current date).</li>
+<li>Optionally collect a list of changed and affected files and directories from the Journal.</li>
+<li>Back up the Source item into Target/Name:
+<ol>
+<li>If the item is a file, and is unchanged from last time or has the same MD5 as a previously backed up file, create a hardlink to the previous one.</li>
+<li>If the item is a directory and is unchanged, make a symlink to the previously backed up directory.</li>
+<li>Otherwise, copy the file or back up the directory, recursively from step 3.</li>
+</ol>
+</li>
+</ol>
+<p style="text-align:justify;">Backing up a file is actually implemented as a check that an old backup can be safely reused, which falls back to a simple copy if it can't. This step could be optimised.</p>
+<p style="text-align:justify;">My other problem, when it comes to projects, is that I'm better at starting them than finishing them! But I can at least throw out some ideas on what still needs to be done:</p>
+<ol style="text-align:justify;">
+<li>Make the command line more powerful, supporting options to enable the Journal, directly symlinks, verbosity, etc.</li>
+<li>Use the exclusions file.</li>
+<li>Improve robustnest: warn if an item can't be copied.</li>
+<li>Use volume shadow copies in Windows -- which means more Windows system calls to learn.</li>
+<li>Log more consistently, and optionally keep the log in the backup.</li>
+<li>Preserve timestamps and other meta-data.</li>
+<li>Optionally use timestamps to detect that a file is unchanged (rather than having to painstakingly compute the MD5 for it).</li>
+<li>Add the option to compress the backup (one idea is that some source directories would be marked as compressible, and all the items in them go into a single ZIP file).</li>
+<li>Don't backup the contents of symlinks.</li>
+<li>Implement a GUI mode for the program.</li>
+</ol>
+<p style="text-align:justify;">And of course, set it up to run regularly, instead of on sporadic occasions when I remember to. This will likely be a goal of my personal NAS project, due to be commenced any day now.  I <a title="World Backup Day again!" href="http://ejrh.wordpress.com/2012/04/03/world-backup-day-again/">seem to have promised</a> to have one by next World Backup Day.</p>
+<p style="text-align:justify;">Anyway, <a title="Edmund's backup program on Google Code" href="https://code.google.com/p/ejrh/source/browse/trunk/backup/">the source</a> is on Google Code.</p>

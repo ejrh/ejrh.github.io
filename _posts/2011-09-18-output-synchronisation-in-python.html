@@ -1,0 +1,102 @@
+---
+layout: post
+title: Output synchronisation in Python
+date: 2011-09-18 16:20:26.000000000 +12:00
+categories:
+- Programming
+tags:
+- python
+- threading
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-09-18
+    06:07:59";}
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">A simple trick to making <code>print</code> more atomic.<br />
+<!--more--></p>
+<p style="text-align:justify;">(Not applicable to Pythons without the GIL, nor to those without the <code>print</code> statement!)</p>
+<p style="text-align:justify;">One of the first problems that a programmer might encounter when writing a multithreaded program is the interleaving of outputs from multiple threads. As the old joke demonstrates:</p>
+<blockquote><p>Q. Why did the multithreaded chicken cross the road?<br />
+A. to get side. To other the</p></blockquote>
+<p style="text-align:justify;">(A source for the joke <a title="Why did the multithreaded chicken cross the road?" href="http://www.pluralsight-training.net/community/blogs/mike/archive/2004/05/25/415.aspx">points out</a> that the punchline isn't even going to be repeatable each time!)</p>
+<p style="text-align:justify;">If a certain output is one of the primary products of your program, it's not too much work to explicitly synchronise it in a variety of ways, such as locks and output queues. But if (like most of us from time to time) you want to add logging or print statements at ad hoc points in your code, worrying about synchronisation for each becomes a burden.</p>
+<p style="text-align:justify;">Say your program has defined a <code>warn</code> function, that can be used to print a message to the standard error stream.</p>
+<p>[sourcecode language="python"]import sys<br />
+import threading</p>
+<p>def warn(msg):<br />
+    thread_name = threading.current_thread().name<br />
+    print &gt;&gt;sys.stderr, thread_name, msg</p>
+<p>def task():<br />
+    for i in range(5):<br />
+        warn('Iteration %d' % i)</p>
+<p>t1 = threading.Thread(target=task)<br />
+t1.start() # Run task in another thread<br />
+task()     # Also run task in the main thread<br />
+t1.join()[/sourcecode]</p>
+<p style="text-align:justify;">When you run the program, you get output like:</p>
+<pre>MainThreadThread-1 Iteration 0Iteration 0
+
+MainThreadThread-1 Iteration 1Iteration 1
+MainThread
+Thread-1Iteration 2
+Iteration 2MainThread
+Thread-1Iteration 3
+Iteration 3MainThread
+Thread-1Iteration 4
+Iteration 4</pre>
+<p style="text-align:justify;">It's obvious that strings aren't being chopped up arbitrarily -- any single element to the print statement is intact -- but at the same, print statements are interfering with each other. Printing the thread name for one completes, but then a context switch occurs and the thread name for another is printed, before the message for the first thread can be appended to that line. It's a mess to read when you're trying to debug your program.</p>
+<p style="text-align:justify;">I hasten to aside that this is <em>not</em> the only possible output from the program, which is part of the problem! I ran it a couple of times to get one that I thought was pretty. Additionally, the fact that a given behaviour -- no single elements chopped up -- exhibits in a run does not guarantee that it's dependable. It may simply be that context switches between elements are 1000000 times as likely as those between characters. In this case however, it happens that switches between characters are impossible, as will be explained below.</p>
+<p style="text-align:justify;">So, you fix it by constructing a whole string first, then printing it:</p>
+<p>[sourcecode language="python"]def warn(msg):<br />
+    thread_name = threading.current_thread().name<br />
+    line = '%s %s' % (thread_name, msg)<br />
+    print &gt;&gt;sys.stderr, line[/sourcecode]<br />
+MainThread Iteration 0Thread-1 Iteration 0</p>
+<p>MainThread Iteration 1Thread-1 Iteration 1<br />
+MainThread Iteration 2<br />
+Thread-1 Iteration 2<br />
+MainThread Iteration 3</p>
+<p>MainThread Iteration 4Thread-1 Iteration 3</p>
+<p>Thread-1 Iteration 4</p>
+<p style="text-align:justify;">It seems that the most of the line is printed atomically, but the implicit end-of-line character is not! Why not? Because it gets compiled to a separate Python bytecode instruction:</p>
+<p>[sourcecode language="python"]&gt;&gt;&gt; import sys<br />
+&gt;&gt;&gt; import dis<br />
+&gt;&gt;&gt; def f():<br />
+...     print &gt;&gt;sys.stderr, 'hi'<br />
+...<br />
+&gt;&gt;&gt; dis.dis(f)<br />
+  1           0 LOAD_GLOBAL              0 (sys)<br />
+              3 LOAD_ATTR                1 (stderr)<br />
+              6 DUP_TOP<br />
+              7 LOAD_CONST               1 ('hi')<br />
+             10 ROT_TWO<br />
+             11 PRINT_ITEM_TO<br />
+             12 PRINT_NEWLINE_TO<br />
+             13 LOAD_CONST               0 (None)<br />
+             16 RETURN_VALUE[/sourcecode]</p>
+<p style="text-align:justify;">CPython's much-loathed <a title="Global Interpreter Lock in Python Wiki" href="http://wiki.python.org/moin/GlobalInterpreterLock">Global Interpreter Lock</a> has done most of the work for making our <code>print</code> statements atomic. As long as two threads interfere only through their use of <code>print</code>, the worst that unsynchronised code can do is mess up the output, and that's only because the statement may have been compiled to more than one instruction, as above. In other languages, not only could the output be garbled at the character level, the internal housekeeping for maintaining the stream could be "garbled" as well. At that point, the entire program's behaviour is hard to reason about with any certainty.</p>
+<p style="text-align:justify;">So, how can we make our use of <code>print</code> fully atomic? Easily: by moving the end-of-line character into the string:</p>
+<p>[sourcecode language="python"]def warn(msg):<br />
+    thread_name = threading.current_thread().name<br />
+    line = '%s %s\n' % (thread_name, msg) # \n is now in explicitly in line<br />
+    print &gt;&gt;sys.stderr, line, # Use trailing , to indicate no implicit end-of-line[/sourcecode]<br />
+MainThread Iteration 0<br />
+Thread-1 Iteration 0<br />
+MainThread Iteration 1<br />
+Thread-1 Iteration 1<br />
+MainThread Iteration 2<br />
+Thread-1 Iteration 2<br />
+MainThread Iteration 3<br />
+Thread-1 Iteration 3<br />
+MainThread Iteration 4<br />
+Thread-1 Iteration 4</p>
+<p style="text-align:justify;">Whole lines are now printed, with no overlap.</p>
+<p style="text-align:justify;">What if you want to print a group of lines contiguously? Simply join them into a single string first. When they are printed, that thread will obtain the GIL, print the entire string using a single instruction, then release the lock and let other threads continue.</p>
+<p style="text-align:justify;">Note that autoflushing normally only applies by default to <code>stderr</code>. To autoflush <code>stdout</code> you could use <code>python -u</code>, or reopen it with more explicit file modes, or just use <code>sys.stdout.flush()</code> after your print statement. However the last option will compile to separate instructions, so you might need to add locking around the print and flush statements... (See this <a title="Python output buffering on Stack Overflow" href="http://stackoverflow.com/questions/107705/python-output-buffering">Stack Overflow question</a> for more info.)</p>

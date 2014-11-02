@@ -1,0 +1,97 @@
+---
+layout: post
+title: Beyond Hello World
+date: 2012-05-10 10:57:15.000000000 +12:00
+categories:
+- Programming
+- Rants
+tags:
+- hello world
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  draftfeedback_requests: a:6:{s:13:"4f967fda66d9d";a:3:{s:3:"key";s:13:"4f967fda66d9d";s:4:"time";s:10:"1335263194";s:7:"user_id";s:8:"14086420";}s:13:"4fa9e7f186b77";a:3:{s:3:"key";s:13:"4fa9e7f186b77";s:4:"time";s:10:"1336535025";s:7:"user_id";s:8:"14086420";}s:15:"kris@punk.co.nz";a:3:{s:3:"key";s:13:"4fa9e857c0828";s:4:"time";s:10:"1336535127";s:7:"user_id";s:8:"14086420";}s:16:"ejrh00@gmail.com";a:3:{s:3:"key";s:13:"4fa9e857d977a";s:4:"time";s:10:"1336535127";s:7:"user_id";s:8:"14086420";}s:13:"4faa2dcc90348";a:3:{s:3:"key";s:13:"4faa2dcc90348";s:4:"time";s:10:"1336552908";s:7:"user_id";s:8:"14086420";}s:13:"4faa3c25aed71";a:3:{s:3:"key";s:13:"4faa3c25aed71";s:4:"time";s:10:"1336556581";s:7:"user_id";s:8:"14086420";}}
+  draft_feedback: ! 'a:2:{s:13:"4f967fda66d9d";a:2:{i:0;a:2:{s:4:"time";s:10:"1335263612";s:7:"content";s:320:"Java
+    does not require a return statement in its ''Hello World'' program.
+
+
+    Your article provides a great insight into some overlooked programming concepts;
+    who really looks at Hello World once they''ve used it only once? This is a nice
+    way to bring it back into thought.
+
+
+    I look forward to reading the complete revision! :-)";}i:1;a:2:{s:4:"time";s:10:"1335263619";s:7:"content";s:320:"Java
+    does not require a return statement in its ''Hello World'' program.
+
+
+    Your article provides a great insight into some overlooked programming concepts;
+    who really looks at Hello World once they''ve used it only once? This is a nice
+    way to bring it back into thought.
+
+
+    I look forward to reading the complete revision! :-)";}}s:15:"kris@punk.co.nz";a:1:{i:0;a:2:{s:4:"time";s:10:"1336571299";s:7:"content";s:51:"Is
+    good. Did you mean to leave it an open question?";}}}'
+  _wpas_done_linkedin: '1'
+  _wp_old_slug: hello-world
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-05-09
+    22:58:34";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">A common pattern for introducing a programming language is the <a title="Hello world program at Wikipedia" href="http://en.wikipedia.org/wiki/Hello_world_program">Hello World</a> program.</p>
+<p style="text-align:justify;">But what exactly can you tell about a language from looking at its Hello World program?<!--more--></p>
+<p>[sourcecode language="java"]public class Hello {<br />
+    public static void main(String[] args) {<br />
+        System.out.println(&quot;Hello, World!&quot;);<br />
+    }<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">What does that tell you about object-oriented programming using classes?</p>
+<p>[sourcecode language="c"]#include</p>
+<p>int main(int argc, char *argv[])<br />
+{<br />
+    printf(&quot;Hello, World!\n&quot;);<br />
+    return 0;<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">What does that tell you about pointers?</p>
+<p>[sourcecode language="fsharp"]module Main where</p>
+<p>main = putStrLn &quot;Hello, World!&quot;[/sourcecode]</p>
+<p style="text-align:justify;">What does that tell you about laziness and functional purity?</p>
+<p>[sourcecode language="erlang"]:- write('Hello, World!'), nl.[/sourcecode]</p>
+<p style="text-align:justify;">What does that tell you about nondeterminism and backtracking?</p>
+<p>[sourcecode language="php"]&lt;?php echo &quot;Hello, World!&quot;; ?&gt;[/sourcecode]</p>
+<p style="text-align:justify;">What does that tell you about poorly-designed languages and libraries? (PHP isn't all bad. I spent years using PHP for most projects of my own free will. And there is a lot of evidence that it's easier than many languages for helping novices create interesting things. As with many simple technologies, the problems appear when you start applying them to more complex projects.)</p>
+<p style="text-align:justify;">The answer is that none of these examples provides much indication of how other (even simple) programs can be written in them; nor do they demonstrate the language's characteristic features or common idioms.  When I saw a lot of Hello World programs in <a href="http://www.infoworld.com/d/application-development/hello-world-programming-languages-quiz-188874" title="'Hello, world': Programming languages quiz">this quiz</a>, I realised that the only feature to distinguish many of them was the name of the standard library function used to print a string.  The features which make a language special were going unmentioned.</p>
+<h2>Benefits of Hello World</h2>
+<p style="text-align:justify;">Hello World has two positive features:</p>
+<p style="text-align:justify;">In a tutorial for a new programming language, it provides a simple test: if you type in and run this short program, and see the output "Hello, World!", then you've at least managed to install the compiler or interpreter correctly.</p>
+<p style="text-align:justify;">It is also a kind of <a href="http://en.wikipedia.org/wiki/Rosetta_Stone" title="Rosetta Stone at Wikipedia">Rosetta Stone</a>. If you know how to write Hello World in one language, and you see a Hello World in another language, you can use the common patterns to (experimentally) understand the new ones. Here's one:</p>
+<p>[sourcecode language="bash"]hello: db 'Hello World', 13, 10, '$'<br />
+mov dx, offset hello<br />
+mov ah, 9h<br />
+int 21h[/sourcecode]</p>
+<p style="text-align:justify;">But can you guess what <code>mov</code> and <code>int</code> mean in that language? (And what does this example tell you about the Intel 8086 instruction set?)</p>
+<p style="text-align:justify;">The reliability of this kind of approximate program translation is therefore quite limited.</p>
+<p style="text-align:justify;">But in regard to the first point, Hello World is still a useful -- and short -- piece of code for testing that a programming environment is ready for use.</p>
+<h2>Improving on Hello World</h2>
+<p style="text-align:justify;">If Hello World is inadequate, what canonical program would better serve to demonstrate the salient features of a programming language?</p>
+<ol style="text-align:justify;">
+<li>Must it use <strong>variables</strong>?</li>
+<li>Must it have <strong>flow control</strong>?</li>
+<li>Must it actually <strong>compute</strong> something?</li>
+<li>Must it use non-primitive <strong>data structures</strong>?</li>
+<li>Must it exhibit use of the language's <strong>code organisation</strong> features?</li>
+</ol>
+<p style="text-align:justify;">These are some of the more generic properties that programs can have.</p>
+<p style="text-align:justify;">The first problem is deciding which language features are fundamental to programming.  A Perl programmer might suggest extracting values from strings, but a Logo programmer might say the obvious example is drawing geometric figures on the screen.  All languages have peculiar strengths.  The aim is not to choose a problem that shows off the abilities of our favourite language, but to show how the language can be used for the same tasks as other languages.</p>
+<p style="text-align:justify;">There are also constraints of brevity and simplicity. All general purpose programming languages allow compilers or translators to be written; a <a href="http://en.wikipedia.org/wiki/Bootstrapping_(compilers)" title="Compiler bootstrapping at Wikipedia">self-hosted compiler</a> is a common benchmark of a language's practicality. But (excepting, perhaps, in the case of LISP), a compiler or interpreter example in every programming language article on Wikipedia is untenable. Moreover, compilers (despite their importance to computing) are very abstruse compared to most other programs. Requiring even a basic knowledge of them for learning a new language is prohibitive.</p>
+<p style="text-align:justify;">So the second problem is to find a compromise between simplicity and variety of language features employed.</p>
+<h2>Possible alternatives</h2>
+<p style="text-align:justify;">Examples of simpler programs from introductory programming are programs such as the factorial function, Fibonacci sequence, and Euclid's GDC algorithm. These often demonstrate the first three features from the list above, but do not often touch on the remaining two.</p>
+<p style="text-align:justify;">Part of the reason is that they are simple numerical functions. One of the benefits of an example program that exhibits the fourth property would be to show that a computer does not just manipulate numbers. It can manipulate any kind of information as long as the structure and operations can be specified. Programs that perform simple string operations (such as reversing a string or counting words), arguably demonstrate this property.</p>
+<p style="text-align:justify;">Strings are built in to most languages (with the notable exception of C) and so are arguably primitive, too.  Demonstration of user-defined structures is also desirable; common examples of these are collection types such as queues.</p>
+<p style="text-align:justify;">It may be harder to demonstrate the last property convincingly in a short program. Features that aid code organisation are most useful in large and complicated programs.  So I will consider that an optional property; small programs have less scope for organisational efficiency.</p>
+<p style="text-align:justify;">One suggestion (from <a href="http://homepages.ecs.vuw.ac.nz/~djp/">David Pearce</a>) was Conway's <a href="http://en.wikipedia.org/wiki/Conway%27s_Game_of_Life" title="Conway's Game of Life at Wikipedia">Game of Life</a>: a simple simulation of finite automata.  This seems like a good demonstration of most of the properties.  It also has the advantage of being accessible: you don't have to understand much theory to appreciate that patterns arising out of simple rules.  It does have the potential downside of being difficult to get right, especially the task of updating a simulation based on its current state; but that provides an opportunity to show how a language helps with that issue.</p>
+<p style="text-align:justify;">What other possible worthy successors to Hello World are there?  Comment below if you can suggest some!</p>

@@ -1,0 +1,95 @@
+---
+layout: post
+title: Sanity checking price formats
+date: 2011-07-09 11:35:13.000000000 +12:00
+categories:
+- Programming
+- Rants
+tags:
+- floating point
+- python
+- work
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-07-08
+    23:35:14";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Why string operations should not be done using floating point.<br />
+<!--more--></p>
+<p style="text-align:justify;">Today at work I've been "sanity checking" some Python code to load trade data. To me, a <em>sanity check</em> is a brief check for well-formedness and obvious errors, rather than a correctness proof. In the case of data input it could be verification against a grammar or schema; for a calculation it's checking for known relationships between values. This implies knowing what some of those relationships should be, of course!</p>
+<p style="text-align:justify;">Although I had no specifications there was a part of the program that deserved close checking. It's a formula to convert a price in "display format" to a numeric value. The display format is interpreted as:</p>
+<pre>Display fomat: XXX.YYZ
+Numeric value: XXX + YY/32 + Z/32/8</pre>
+<p style="text-align:justify;">Where XXX are digits in base 10, YY is a digit in base 32, and Z is a digit in base 8. For example, "100.051" = 100 + five 32nds + one 8th of a 32nd = 100.16015625.</p>
+<p style="text-align:justify;">Why they do this is unknown to me. Finance and accounting is full of crazy definitions. At least this one is merely confusing, inconsistent with mathematical convention, and prone to misunderstanding. (A previous case I've seen involved a risk measure defined as the square root of a monetary amount, expressed as a monetary amount. Dimensional analysis shows that such a figure is completely meaningless, because if sqrt($1) = $1, and sqrt(100 cents) = (10 cents), then $1 = 10 cents.)</p>
+<p style="text-align:justify;">Anyway, the original code translated the format by cutting it up using <code>int</code> and <code>% 1</code> (i.e. the fractional part of a number). Here's one implementation (admittedly my own first draft of the algorithm as explained to me):</p>
+<p>[sourcecode language="python"]def convert_price2(p):<br />
+    &quot;&quot;&quot;Price is displayed in the format XXX-YYZ (or XXX.YYZ) which is converted to a value as:<br />
+        x = XXX + YY/32 + Z/32/8<br />
+    i.e. XXX are digits in base 10, YY is a digit in base 32, and Z is a digit in base 8 (crazy isn't it!).&quot;&quot;&quot;<br />
+    x = int(p)<br />
+    q = (p % 1) * 100<br />
+    y = int(q)<br />
+    z = (q % 1) * 10<br />
+    return x + y/32.0 + z/32.0/8.0[/sourcecode]</p>
+<p style="text-align:justify;">What happens when the display format is: 100.020? First it gets parsed as a floating point value. But how's it stored? Not all real values can be stored precisely in floating point. And even apparently round (in decimal at least) values like 0.02 can't be stored. This nearest floating point value is 100.0199999999999960209606797434389591217041015625. The flow of calcuation is:</p>
+<table>
+<tbody>
+<tr>
+<th>Variable</th>
+<th>convert_price2</th>
+<th>Expected</th>
+</tr>
+<tr>
+<td>p</td>
+<td>100.0199999999999960209606797434389591217041015625</td>
+<td>100.020</td>
+</tr>
+<tr>
+<td>x</td>
+<td>100</td>
+<td>100</td>
+</tr>
+<tr>
+<td>q</td>
+<td>1.99999999999960209606797434389591217041015625</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>y</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>z</td>
+<td>9.9999999999960209606797434389591217041015625</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Return value</td>
+<td>100.0703124999999857891452847979962825775146484375</td>
+<td>100.0625</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">A better algorithm would treat it as a string and extract the groups of digits properly.  It's not elegant, exactly, but it gives the right results.</p>
+<p>[sourcecode language="python"]def convert_price3(p):<br />
+    &quot;&quot;&quot;Price is displayed in the format XXX-YYZ (or XXX.YYZ) which is converted to a value as:<br />
+        x = XXX + YY/32 + Z/32/8<br />
+    i.e. XXX are digits in base 10, YY is a digit in base 32, and Z is a digit in base 8 (crazy isn't it!).<br />
+    N.B. Perform calculations on substrings rather than fractions if you want to avoid floating point errors!&quot;&quot;&quot;<br />
+    s = '%07.3f' % p<br />
+    x = int(s[0:3])<br />
+    y = int(s[4:6])<br />
+    z = int(s[6:7])<br />
+    return x + y/32.0 + z/32.0/8.0[/sourcecode]</p>
+<p style="text-align:justify;">I guess it's another example of why some computations (financial ones in particular) <a title="Why we don't use doubles for financial calculations, discussion on Reddit" href="http://www.reddit.com/r/programming/comments/i6i0h/why_we_dont_use_doubles_for_financial_calculations/">shouldn't be done in floating point</a>.</p>
+<p style="text-align:justify;">But I prefer to see it as an example of why financial computation is often just broken. If you try to extract digits from floating point using arithmetic, you have to expect this kind of behaviour.  And if you use floating point for storing hetrogeneous-base numbers, you're just crazy.</p>
+<p style="text-align:justify;">Finally, to compound my digit-shuffling woes, I've been asked to implement the reverse algorithm in an SQL query.  Dealing with this format has certainly come close to a check on my sanity! :p</p>

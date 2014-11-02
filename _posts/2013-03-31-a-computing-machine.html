@@ -1,0 +1,80 @@
+---
+layout: post
+title: A computing machine
+date: 2013-03-31 18:34:07.000000000 +13:00
+categories:
+- Hardware
+- Programming
+tags:
+- cpu
+- fpga
+- verilog
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _publicize_pending: '1'
+  _wpas_done_404107: '1'
+  _publicize_done_external: a:1:{s:8:"linkedin";a:1:{s:10:"yYPUWjDCaX";b:1;}}
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";i:0;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2013-03-31
+    05:34:16";}
+  _wpas_skip_1984850: '1'
+  _wpas_skip_404107: '1'
+author: 
+---
+<p>As mentioned previously, I've been <a href="http://ejrh.wordpress.com/2013/02/20/learning-verilog/">trying my hand at Verilog</a> -- a language for designing electronic circuits.  This post discusses the next project I attempted: a <a href="http://en.wikipedia.org/wiki/Central_processing_unit">Central Processing Unit</a>.</p>
+<h2>Magic of computation</h2>
+<p>A CPU is the part of a computer that coordinates all the other parts of it.  It reads the program from memory, determines what each instruction of the program means, and reads, writes or otherwise manipulates memory, disk, screen, and other devices according to each simple instruction.  CPUs are where the magic of computation happens.  And computation is magic; the only magic that exists in the real world: the special kind of magic that is indistinguishable from sufficiently advanced technology.  </p>
+<p>It is easy to take for granted that a small device bought from a shop can display text or images from remote locations.  But general purpose computers are marvellous machines that were unknown to humanity for thousands of years.  The realisation that physical machines can manipulate intangible data has a history from the <a href="http://en.wikipedia.org/wiki/Antikythera_mechanism">Antikythera mechanism</a> to Babbage's <a href="http://en.wikipedia.org/wiki/Analytical_Engine">Analytical Engine</a>.  All these machines were special purpose (though the Analytical Engine was Turing complete).  A general computer can be programmed to mimic any one of these, and an infinite variety more.</p>
+<p>Modern CPUs are massively complicated and contain millions of individual design parts.  The driving force behind this complexity is not the discovery of new kinds of computation; it is the demand for speed.  Faster computers do permit new applications.  However, even a slow, simple, primitive computer such as the one described here can execute the same algorithms as any more sophisticated computer.</p>
+<h2>Motivation, inception and development</h2>
+<p>Computer hardware, especially CPUs, is mysterious to most of us.  Most people, even most programmers, are happy for it to remain so.</p>
+<p>I was introduced to logic gates at school.  There was no real computer science curriculum in those days, so what kind of exposure you got to computer science was a combination of your own study and your fortune in having a proactive teacher who knew something beyond how to use a word processor.  My teacher was Martyn Leda who knew lots of things besides word processing.  One of the classes was "Computer Programming" which introduced us to a plethora of languages and included some low level things like assembly programming, and some circuit design.  I think it was after learning about turning gates into half adders into full adders and so on that I began to whimsically "design" my first CPU.  The combinational logic was obvious, and I knew something about flip flops, but everything about how the CPU actually got work done was obscured by liberally applied handwaving.</p>
+<p>It was also the case that my inspiration was the Intel 8086, a CISC design.  Those chips were designed for an era and purpose in which hardware was expensive and programming effort was relatively cheap.  Consequently, they were far from simple designs and featured many complications to make the most of hardware.  (Later chips are more complicated still, internally: they support the original 8086 instruction set and its successors, but they do so by emulating those chips on top of a completely different lower level computer design.)</p>
+<p>Years later at university I took a class on hardware, based on the textbook <em>Computer Organisation</em> by Patterson and Hennessy.  This book covers a large part of computing hardware design, including a description of a complete <a href="http://en.wikipedia.org/wiki/MIPS_architecture">MIPS</a> processor from its logic gates to its assembly language.  That book gave me one of those rare learning experiences in which a curtain is drawn back, and the hitherto mysterious system behind it is revealed.  The system is still as marvellous as before.  Now there is also wonder at how it was created, and moreover, that it can be comprehended by people like me.</p>
+<p>That course was completely theoretical.  It was not until I began learning Verilog that the few missing parts of my mental CPU design began to drop into place and I had a realistic chance of seeing it work.  Kris (who got me started with Verilog) suggested (perhaps jokingly) that I should make a "4 bit CPU".</p>
+<p>The actual design was different, and inspired not only by the 8086, and by MIPS, but also by Charles Thacker's <a href="http://www.cl.cam.ac.uk/teaching/1112/ECAD+Arch/background/ttc.html">Tiny Computer 3</a>.  A short PDF describes this computer and even contains 2 pages of Verilog code.  My CPU turns out to be quite different and far less concise, efficient and capable.</p>
+<p>I've put the <a href="https://github.com/ejrh/cpu">Verilog source</a> on Github.  The <a href="https://github.com/ejrh/cpu/blob/master/README.md">README</a> file there includes a description of the architecture.  At the end of this post I'll list some of the outstanding limitations and outline some possible next steps.</p>
+<p>Over a few days I created the basic CPU, testing it in Icarus.  It took as much work again to get it running on an FPGA!  A number of changes had to be made:</p>
+<ul>
+<li>Unsynthesisable constructs: these were mostly <code>$display</code> and some of ways values were initialised.  The worst was my use of <code>$readmemh</code> to load the program memory.  This should be synthesisable but Xilinx had so much trouble I ended up <em>copying and pasting</em> the hex values from my program into the Verilog source.</li>
+<li>An outer layer for FPGA use.  The CPU is useless and arguably meaningless if it can't communicate with the real world.  In simulation, it can print to the console.  On an FPGA, it cannot do that, so it needs to communicate using the device's IO capabilities, such as the seven segment display.</li>
+<li>Timing issues: in many places I'd relied on the simulator's use of an event queue to perform simulation updates in a useful order.  In the real world, updates are applied simultaneously, so on the FPGA nothing was happening in the order I expected.  (Verilog does allow timing directives to make the simulation reflect real world conditions, but I have not mastered these.)</li>
+<li>More timing issues: in many places I've derived new clock signals using combinational logic.  This doesn't work so well in the real world.  Arguably it's because there will be so much more skew with the derived signals.  More practically in my case, it's because the synthesis tools cannot analyse the derived clocks and hence have no idea what the timing constraints on them are.  I could run my CPU on the FPGA by stepping down the clock rate by a factor of a million -- there was some Verilog code that would count the ticks of the FPGA's source clock at 50MHz, and update a derived CPU clock whenever the count reached a certain number.  As I reduced the slowdown and the CPU ran faster, eventually it would start computing garbage.  The solution was to replace derived clocks with the use of a single source clock, and enable signals.  That signal clock is described in the constraints file, and the synthesiser can recognise all the circuits that depend on it and ensure the paths through them are shorter than 50MHz.</li>
+</ul>
+<h2>Machine in action</h2>
+<p>Often a new computer or virtual machine is demonstrated by <a href="http://www.youtube.com/watch?v=RFnjS7qCrg8">running a port of Quake</a> or other well known program on it.  Sadly, such feats were well beyond my CPU's capabilities at the time I first got it running in hardware (a few weeks after beginning to learn Verilog).</p>
+<p>[youtube=https://www.youtube.com/watch?v=8q74WBc94rw]</p>
+<p>This video shows the CPU in operation, computing the Fibonacci sequence.  The display is in hex.  This does make the output somewhat strange, but it a lot easier for a binary computer to generate.  (Circuitry to turn a binary number into a sequence of decimal digits for display is not trivial!)</p>
+<p>Here is the source for that Fibonacci program.  This is not assembly language -- there is no assembler for this machine yet.  This is hand typed machine code.  True, I did not have to enter it one bit at a time by toggling a switch.  Compared to programmers of yesteryear I was blessed with a text editor to type it in, a hexadecimal based code format, and a very simple instruction set.</p>
+<p>[sourcecode language="text"]0000 // FIBONACCI EXAMPLE<br />
+E300 // Set Limit = 32768<br />
+F380 // &quot;<br />
+E701 // Set Increment = 1<br />
+F700 // &quot;<br />
+E600 // Set Counter = 0<br />
+F600 // &quot;<br />
+E100 // Main loop: Set A = 0<br />
+F100 // &quot;<br />
+E201 // Set B = 1<br />
+F200 // &quot;<br />
+B001 // Fibonacci loop: Output 0 to port 1<br />
+B201 // Output B to port 1<br />
+3432 // Check if Limit &lt; B<br />
+D405 // If so, exit loop<br />
+0512 // Set C = A + B<br />
+0102 // Set A = B<br />
+0205 // Set B = C<br />
+C0F9 // Jump to Fibonacci loop<br />
+0667 // Increment Counter<br />
+B600 // Output Counter to port 0<br />
+C0F2 // Jump to Main loop[/sourcecode]</p>
+<p>Each 4-digit number is an instruction.  The first digit is the instruction, for instance <code>0</code> is <code>add</code>.  The next three digits are the register numbers to operate on, or constant values to use.  Line 16 means "add the values from registers 1 and 2 and store the result in register 5".  The most difficult instruction to write was the jump <code>COF2</code> on line 22.  <code>C</code> is jump; but the offset is made from the last two digits and addresses are modulo 256.  Jumping by <code>F2</code> = 242 is the same as jumping by -14.  The effect is to move the instruction pointer back to line 8.</p>
+<h2>Where next?</h2>
+<p>Although the instruction set contains <code>load</code> and <code>store</code> instructions, the CPU has no actual data memory!  Many interesting things can be computed using a handful of registers, but I admit that I'm not sure I can port Quake to it without some support for arrays.</p>
+<p>Additionally, the CPU cannot manipulate program memory, save for executing it.  It can't be read, it can't be written, and it can't even be addressed properly.  The instruction pointer is hidden and all jumps are relative.  This is a consequence of the design: the instruction format provides only 4 bits for the opcode, yielding a maximum of 16 instructions.  Even when additional instructions are easily implemented, it is hard to find distinct opcodes for them.</p>
+<p>I believe that arrays and function pointers, at least, will need to be supported for the CPU to be capable of supporting C programs.  Writeable memory is also a requirement for proper general purpose use: instead of reading a hardcoded program memory, the CPU should boot up, read the program from somewhere, and start running it.</p>
+<p>The instruction format is constricted but there is a nascent "ports" system that provides expandability.  There is no standard assignment, but on the FPGA I've wired some ports to the seven segment display.  Others could be wired to other devices.  Similarly, the memory address space could be partitioned into program memory, data memory, and video memory.</p>
+<p>As shown above, the instruction set is relatively easy to program by hand.  But an assembler would make it easier.  A compiler would be even better!</p>
+<p>It should be noted it is far easier to muse on these possible improvements than it is to go forth and implement them.  The CPU project is primarily for learning and amusement.  When motivation depends on amusement it is easy to slack off once all the really interesting bits have been done.  But some other FPGA-related projects have suggested a use for a small microprocessor core.  Even with HDLs like Verilog, there are still many algorithms that are easier to implement as programs than as circuits.</p>

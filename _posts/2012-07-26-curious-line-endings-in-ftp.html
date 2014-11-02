@@ -1,0 +1,42 @@
+---
+layout: post
+title: Curious line-endings in FTP
+date: 2012-07-26 19:15:42.000000000 +12:00
+categories:
+- Programming
+tags:
+- ftp
+- java
+- url
+- vms
+- work
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";i:0;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-07-26
+    07:15:42";}
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+author: 
+---
+<p style="text-align:justify;">Whilst hurriedly implementing basic FTP support in a program that's due in a couple of days, I ran into a strange phenomenon:</p>
+<ul style="text-align:justify;">
+<li>Retrieving <code>ftp://login:password@server/data.csv</code>, a multiline text file, will return the file intact.</li>
+<li>Retrieving <code>ftp://login:password@server/data.dat</code>, another multiline text file, won't: all the data will be on one line.</li>
+</ul>
+<p><!--more--></p>
+<p style="text-align:justify;">The code simply uses Java's builtin <a title="Java URL class" href="http://docs.oracle.com/javase/6/docs/api/java/net/URL.html">URL handling</a>:</p>
+<p>[sourcecode language="java"]URL url = new URL(&quot;ftp://login:password@server/data.dat&quot;);<br />
+InputStream inputStream = URL.openStream();<br />
+//read data from inputStream[/sourcecode]</p>
+<p style="text-align:justify;">And the data is hosted on a <a title="VMS at Wikipedia" href="http://en.wikipedia.org/wiki/OpenVMS">VMS</a> server to which I have no other access.</p>
+<p style="text-align:justify;">Fetching the file using the FTP command line program works successfully. But the data returned in Java contains no end-of-line bytes of any kind.</p>
+<p style="text-align:justify;">The obvious culprit is the <code>binary</code>/<code>ascii</code> dichotomy. FTP contains functionality to translate ASCII files between different line-ending conventions. And in this case, it seems that the default mode to use is inferred from the filename in the URL: if it ends in <code>.csv</code>, it's "obviously" a text file; if it ends in <code>.dat</code> it's "obviously" a data (i.e. not text) file, and so on. I believe (but have not verified) that this determination is made by the client, which prefaces its <code>get</code> command with the <code>binary</code> or <code>ascii</code> command as appropriate.  On the command line, setting <code>binary</code> mode before fetching results in a single-line file, matching the behaviour of Java.</p>
+<p style="text-align:justify;">The curious thing is that the .dat file is detected as a binary, but the resulting data has been translated as if it was text. This seems to indicate some mismatch between what the server and the client are doing.</p>
+<p style="text-align:justify;">It could also indicate something unusual in the end-of-line indicators that are used in the original file -- that VMS FTP knows how to translate them to ASCII, but that the recipient system doesn't recognise them at all (not even as bytes). Does VMS use <a title="EBCDIC at Wikipedia" href="http://en.wikipedia.org/wiki/EBCDIC">EBCDIC</a>? Of course, there is no way I can find out what those bytes are, because my only access is via FTP and the indicator bytes are stripped in binary mode, or converted in text mode.</p>
+<p style="text-align:justify;">Anyway, at this point, it seems I just need to force an <code>ascii</code> mode transfer. The URL syntax for this turns out to be:</p>
+<p style="text-align:justify;"><code>ftp://login:password@server/data.dat;type=a</code></p>
+<p style="text-align:justify;">(The alternative for <code>binary</code> transfers being <code>;type=i</code>, being binaries are "obviously" images...)</p>
+<p style="text-align:justify;">This works, though it does feel a bit sneaky to alter the user-provided URLs like this. But at least I can support FTP in a few lines of code, instead of needing to rely on yet another third-party library.</p>

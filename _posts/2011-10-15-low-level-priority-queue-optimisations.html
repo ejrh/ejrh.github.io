@@ -1,0 +1,120 @@
+---
+layout: post
+title: Low-level priority queue optimisations
+date: 2011-10-15 22:20:28.000000000 +13:00
+categories:
+- Programming
+- Science
+tags:
+- c
+- fractal
+- gcc
+- msvc
+- simd
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-10-16
+    03:48:56";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Optimising the Fractal's trace mode by changing the priority queue and enabling SIMD.<br />
+<!--more--></p>
+<p style="text-align:justify;">As mentioned in an aside of the <a title="Mandelbrot calculation using SIMD" href="http://ejrh.wordpress.com/2011/10/13/mandelbrot-calculation-using-simd/">previous post</a>, the priority queue implementation used by the TRACE mode is inefficient. During some profiling using gprof, I noticed that the <code>sift_up</code> method was taking around 50% of the time. This method is called when the root of the heap is consumed; it determines which child should be sifted into the root's position, then calls itself recursively on the child's vacated position.</p>
+<p style="text-align:justify;">The PQ implementation is generic. It doesn't assume anything about its elements, except that each has a 32-bit signed integer priority (where the lowest number becomes the root), and a fixed size item. The PQ is initialised with the item size, and calls to push and pop items are done using pointers to the item data. Internally, each slot is the priority concatenated with the item, and <code>memmove</code> is used to move items up and down the heap. In the absence of template programming, Just-in-Time optimisation, and low-level hacks, there's a certain overhead of this implementation.</p>
+<p style="text-align:justify;">There are $1920 \times 1080 \times 4 = 8294400$ pixels when the fractal drawn on my desktop.  But it's possible for a pixel to be queued, then requeued again with a different priority, if two of its neighbours are evaluated before it.  There are 8 neighbours so ostensibly the queue could grow to $latex 8294400 \times 8 = 66355200$ items.  The priority queue is stored as a heap; when it has this many items, the depth will be $latex log_2 66355200 \approx 25.98$.  That is how many items will potentially need to be moved each time the root of the heap is consumed.</p>
+<p style="text-align:justify;">The items on the TRACE mode's priority queue are <code>COORD</code> structures, containing x and y coordinates (32-bit integers). Combined with the priority, each slot in the heap holds 12 bytes. I have checked, and <code>memmove</code> is always used to move them. There is no way the compiler can see that item_size will in fact be 8 bytes; even if pq.c and trace.c were a single file, I am not sure the compiler would be able detect that <code>item_size</code> will always be 8. My surmise was that the cost of making a separate <code>memmove</code> call just to move 12 bytes would be greater than simply doing 3 word assignments directly. I thought the compiler would agree with me, if I provided suitable encouragement:</p>
+<p>[sourcecode language="c"]if (pq-&gt;slot_size == 12)<br />
+    memmove(*x, *c1, 12);   // Moving exactly 12 bytes, so inline the call, damn it!<br />
+else<br />
+    memmove(*x, *c1, pq-&gt;slot_size);[/sourcecode]</p>
+<p>But the optimised assembly output in both MSVC and GCC still call <code>memmove</code>.</p>
+<p style="text-align:justify;">I want PQ to remain generic, and did not want to add a special case for size-12 slots just because that's how PQ would be used in this program. And I also had a plan to reduce the item size -- in fact, to combine the item with the priority, because 32 bits really is enough information for them both. Adding explicit support for priority queues with no items seemed reasonable. The slot size would be 4, which meant slot assignment was simple integer assignment:</p>
+<p>[sourcecode language="c"]if (pq-&gt;item_size == 0)<br />
+    *x = *c1;   // No item data, so just assign the priority.<br />
+else<br />
+    memmove(*x, *c1, pq-&gt;slot_size);[/sourcecode]</p>
+<p style="text-align:justify;">The next step is to pack the priority, and x and y coordinates into a single 32 bit signed integer, which PQ would then treat as the priority. My largest screen is 1920x1080, and the fractal is drawn at double resolution, for antialiasing. Therefore 12 bits should be enough to hold each pixel coordinate (up to 4096 pixels in each direction). That leaves 8 bits for the priority. There are two approaches to maintaining these three items in 4 bytes:</p>
+<ol>
+<li style="text-align:justify;">Using bit masks and shift operators. For example, extraction of bits 12-23 would be <code>x = (data &gt;&gt; 12) &amp; 4095</code> -- first we shift it 12 bits down, then we mask out the higher bits, leaving the value we want in <code>x</code>.</li>
+<li style="text-align:justify;">Using C's bit fields. Bit fields are a low level feature that allow us to divide an integer into groups of bits.</li>
+</ol>
+<p style="text-align:justify;">I chose to try the second approach. I think it is the first time I've used bit fields in a C program. (Most of my C programming is <a title="Higher-level C" href="http://ejrh.wordpress.com/higher-level-c/">higher level</a>...)</p>
+<p>[sourcecode language="c"]typedef struct COORDS<br />
+{<br />
+    unsigned int x:12;<br />
+    unsigned int y:12;<br />
+    char priority:8;<br />
+} COORDS;[/sourcecode]</p>
+<p style="text-align:justify;">Note that this entire structure is treated as the item priority in PQ. It's therefore best if it compares priorities starting at the <code>priority</code> bit field. A bit of experimentation was required to determine that putting it last in the structure puts it in the most significant bits of the integer form used inside PQ.</p>
+<p style="text-align:justify;">Some additional debugging was needed to get it drawing properly again. There is an outstanding minor effect of the compressed priority space -- in interesting parts of the fractal, most pixels will have the maximum priority, so the fractal does not trace as effectively as it could (it tends to floor fill the sufficiently interesting pixels from the top). This will be fixed by taking the logarithm of the pixel value as its priority.</p>
+<p style="text-align:justify;">I develop Fractal on both Linux and Windows. Compiling the new version in MSVC revealed some interesting problems. Garbage was coming out the PQ. It turned out that the size of the <code>COORDS</code> bitfield was 5 bytes, not 4! There is documentation on structure packing and alignment on MSDN but it was too copious and obtuse to help me. I found the answer in the <a title="GCC documentation on structure packing and alignment" href="http://gcc.gnu.org/onlinedocs/gcc/Variable-Attributes.html">GCC documentation</a> (of all places). When describing an option it provides for compatibility on Windows, it explains the MSVC packing algorithm: "Adjacent bit fields are packed into the same 1-, 2-, or 4-byte allocation unit if the integral types are the same size and if the next bit field fits into the current allocation unit." Now, my fields do fit into the allocation unit; but the last field was a different type, so it had to be put in a new unit. Changing it to <code>unsigned long int</code> solves the problem.</p>
+<p style="text-align:justify;">This is the first time in my experience that changing a type from 8-bit <code>byte</code> to 32-bit <code>unsigned long int</code> results in a smaller object. ;-)</p>
+<p style="text-align:justify;">I have implemented TRACE_LOOP and TRACE_SIMD modes. The performance improvement of TRACE_SIMD over TRACE is approximately the same as it was for SIMPLE_SIMD and SIMPLE. Tracing is still significantly slower than other drawing modes. But the gap has been reduced: TRACE was around 8-10 times slower on the original benchmark; now it's 4-5 times lower.</p>
+<p style="text-align:justify;">I've also changed the standard benchmark to focus on a slightly more interesting part of the fractal. The pixels in the new area will be deeper, and so provide a better benchmark for the main calculation.</p>
+<p style="text-align:justify;">The new benchmark results are:</p>
+<table>
+<tbody>
+<tr>
+<th>Mode</th>
+<th>Depth 100</th>
+<th>Depth 1000</th>
+<th>Depth 10000</th>
+</tr>
+<tr>
+<td>SIMPLE</td>
+<td>1358497</td>
+<td>699527</td>
+<td>665732</td>
+</tr>
+<tr>
+<td>SIMPLE_LOOP</td>
+<td>1335164</td>
+<td>730508</td>
+<td>695060</td>
+</tr>
+<tr>
+<td>SIMPLE_SIMD</td>
+<td>1679148</td>
+<td>932749</td>
+<td>926970</td>
+</tr>
+<tr>
+<td>PARALLEL</td>
+<td>3326163</td>
+<td>3302414</td>
+<td>1965352</td>
+</tr>
+<tr>
+<td>TRACE</td>
+<td>584272</td>
+<td>352806</td>
+<td>344100</td>
+</tr>
+<tr>
+<td>TRACE_LOOP</td>
+<td>462722</td>
+<td>349757</td>
+<td>341257</td>
+</tr>
+<tr>
+<td>TRACE_SIMD</td>
+<td>491707</td>
+<td>398985</td>
+<td>393672</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">I have not implemented SIMD for the PARALLEL mode yet; nor have I made the SIMPLE and TRACE modes parallel! Ultimately there are at least three distinct dimensions to the mode model the program uses:</p>
+<ul>
+<li style="text-align:justify;">The drawing mode proper. This determines the order in which pixels are computed and drawn.</li>
+<li style="text-align:justify;">The main calculation mode: whether SIMD is used (and potentially, what variety of SIMD). It could also mean other variations on that main loop.</li>
+<li style="text-align:justify;">The multiprocessing mode: whether threads are used.</li>
+</ul>
+<p style="text-align:justify;">Implementing new modes helps to develop this model. This is not unlike the development of a scientific theory by accumulating evidence of various related phenomena. Simple mode with SIMD and tracing mode without it were once two incomparable particles in the model; but the SIMD aspects of each have been unified (thanks to the abstraction of <code>mfunc_simd</code> and its <code>next_pixel</code> and <code>output_pixel</code> callbacks). For these modes, at least, the drawing mode is more or less orthogonal to the calculation mode. Parallel mode, like an exotic particle, does not yet fit into this framework. But once it adapts to SIMD, and once it shares its threading abilities (via another abstraction, hopefully) with the other drawing modes, the model will be complete. Until one day a new mode is discovered that spurs new "science" to be done.  One such speculative discovery is offloading computation to a GPU.</p>
+<p style="text-align:justify;">

@@ -1,0 +1,87 @@
+---
+layout: post
+title: Cluster size experiment
+date: 2012-10-26 22:12:25.000000000 +13:00
+categories:
+- Hardware
+- Programming
+tags:
+- benchmarking
+- file system
+- windows
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:56:"http://ejrh.files.wordpress.com/2012/10/random-reads.png";s:6:"images";a:3:{s:52:"http://ejrh.files.wordpress.com/2012/10/copying1.png";a:6:{s:8:"file_url";s:52:"http://ejrh.files.wordpress.com/2012/10/copying1.png";s:5:"width";i:615;s:6:"height";i:424;s:4:"type";s:5:"image";s:4:"area";i:260760;s:9:"file_path";b:0;}s:56:"http://ejrh.files.wordpress.com/2012/10/random-reads.png";a:6:{s:8:"file_url";s:56:"http://ejrh.files.wordpress.com/2012/10/random-reads.png";s:5:"width";i:615;s:6:"height";i:423;s:4:"type";s:5:"image";s:4:"area";i:260145;s:9:"file_path";b:0;}s:61:"http://ejrh.files.wordpress.com/2012/10/sequential-reads1.png";a:6:{s:8:"file_url";s:61:"http://ejrh.files.wordpress.com/2012/10/sequential-reads1.png";s:5:"width";i:615;s:6:"height";i:423;s:4:"type";s:5:"image";s:4:"area";i:260145;s:9:"file_path";b:0;}}s:6:"videos";a:0:{}s:11:"image_count";i:3;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-10-26
+    09:12:25";}
+  _wpas_done_404107: '1'
+  _publicize_done_external: a:1:{s:8:"linkedin";a:1:{s:10:"yYPUWjDCaX";b:1;}}
+  _wpas_skip_404107: '1'
+  twitter_cards_summary_img_size: a:6:{i:0;i:615;i:1;i:424;i:2;i:3;i:3;s:24:"width="615"
+    height="424"";s:4:"bits";i:8;s:4:"mime";s:9:"image/png";}
+author: 
+---
+<p style="text-align:justify;">After getting the SSD for my system, I've been able to repartition the existing HDD into a data-only drive. I typically have a small partition for general files (basically my documents and source code), and a big one for large files (various media).</p>
+<p style="text-align:justify;">The question was: what cluster size should I choose for each partition?</p>
+<h2>Received wisdom</h2>
+<p style="text-align:justify;">In the past I choose the default size of 4 kB for most partitions, with a larger size for those on which I know I'm going to be storing large files. This habit was formed out of received "wisdom" (i.e. peer pressure) and a general understanding of file systems. The practical effects of these choices are, as I understand them, roughly the following:</p>
+<ul style="text-align:justify;">
+<ul>
+<li>4 kB - the default NTFS cluster size, which enables useful features like compression. Compression should not generally be used but can be extremely useful when you have large quantities of compressible data that you need to keep available but which is infrequently used. Writing to compressed files can be expensive, but for reading they can be even cheaper than uncompressed files, because fewer disk reads are necessary for the same amount of data. The tradeoff depends on whether disk bandwidth or CPU time is the more precious commodity in your system.</li>
+<li>4 kB - matches the memory page size (which could conceivably make paging marginally more efficient, but I honestly have no evidence of that and insufficient knowledge to do more than list it as a possibility).</li>
+<li>4 kB - has modest internal fragmentation, with an average of 2 kB wasted per file. (The smallest cluster size of 512 bytes has even less fragmentation, of course. But it may have other downsides.)</li>
+<li>64 kB - ensures a large minimum extent size, so at least 64 kB can always be read contiguously.</li>
+<li>64 kB - has potentially high internal fragmentation -- average of 32 kB wasted per file. With large files this will be negligible, but for small files the amount of wasted space will be significant.</li>
+<li>64 kB - there will be fewer clusters in the partition, so less file system metadata may be required. My understanding is that NTFS uses extents to record cluster usage, but some things such as free space bitmaps may be smaller.</li>
+</ul>
+</ul>
+<p style="text-align:justify;">Normally I'd be satisfied that these are adequate choices, and resigned to the fact that I probably won't notice any difference.</p>
+<p style="text-align:justify;">But this time, I thought I'd put a bit more research into the decision. Not only did I want to make the new system as efficient as possible, I was also curious about whether my HDD partitioning beliefs these past years were accurate.</p>
+<p style="text-align:justify;">What advice does the internet have? As expected, a lot. Some of it is based on rather suspect reasoning, and all of it seems to be on assumption rather than experience -- let alone experimental data. There were no obvious benchmarks to be found. Perhaps it was time someone conducted an experiment.</p>
+<h3>Expectations from basic theory</h3>
+<p style="text-align:justify;">Without knowing much about file systems, it is reasonable to guess that, in addition to the cost of reading or writing data, there is an overhead per cluster accessed.  So, the fewer clusters to be accessed per unit size, the lower this overhead will be.  The number of clusters is inversely proportional to the cluster size.  The total cost of cluster accesses becomes significant when there are very many small clusters in a file.</p>
+<p style="text-align:justify;">Another possibility is that with larger clusters, there will be a larger amount of excess data in any cluster that is accessed.  (Although it's possible that NTFS optimises partial cluster reads and writes down to their minimal size in blocks.)  So, when accessing a full file there is an average of half a cluster of unused data in the final cluster to be read or written; similarly when reading or writing at any point within a file, an entire cluster must be accessed.  This cost is proportional to the cluster size, and so becomes great when cluster sizes are very large.</p>
+<p style="text-align:justify;">The sum of these costs for cluster size s is $latex A/s + Bs$ for some constants A and B.  The shape of this curve in general is a very high peak where the first term dominates for small s, dipping as s increases, and then climbing again as the second term dominates.  This suggests that for any given task, there is an optimum cluster size somewhere between the two extremes (but note that all permitted cluster sizes may be reasonable in practice).</p>
+<h2>The experiment</h2>
+<p style="text-align:justify;">For each cluster size between 512 bytes and 64 kB, perform a benchmark:</p>
+<ul style="text-align:justify;">
+<ul>
+<ol>
+<li>Start with a partition on the HDD.</li>
+<li>Format it with the candidate cluster size.</li>
+<li>Make a note of the free space on it.</li>
+<li>Benchmark for moderate sized files:
+<ol>
+<li>Copy a large data set of files from another location.</li>
+<li>Make a note of the space remaining after the copy.</li>
+<li>Randomly read from a location in each file.</li>
+<li>Read the full contents of each file.</li>
+</ol>
+</li>
+<li>Benchmark for large sized files, using the same steps as for moderate sized files.</li>
+</ol>
+</ul>
+</ul>
+<p style="text-align:justify;">Avoid performing any other activity on the computer while benchmarking. Repeat each benchmark several times to average out these effects.</p>
+<p style="text-align:justify;">The drive to be tested is a Western Digital Caviar Green 2TB, with 64MB Cache running on SATA II. The same partition is reused, which takes up the last 67% of the drive. (A common danger of benchmarks in the past was the use of different parts of a drive for each test -- such as comparing Windows vs Linux file system performance on a machine with a partition for each operating system; the speed of the drive can depend on which part of it is being accessed.)</p>
+<p style="text-align:justify;">The same data sets of files are used in each benchmark. The moderate sized file set consists of 30,497 files of total size 11.2 GB. The large sized file set consists of 134 files of total size 20.4 GB. The same pattern of random reads is used in each benchmark.</p>
+<h2>Results</h2>
+<p style="text-align:justify;">I have conducted the above experiment and I'll try to summarise the results here.</p>
+<h3>Space usage</h3>
+<p style="text-align:justify;">Firstly, some observations on space usage.  The initial space after formatting the partition depends on the cluster size.  In fact, approximately 8 bytes of space is required per additional cluster.</p>
+<p style="text-align:justify;">And, as expected, larger cluster sizes result in some wasted space in the final cluster of each file (internal fragmentation).  For small files on large clusters this can be significant.  For sufficiently large files we expect to waste half a cluster per file.  But if many files are smaller than half a cluster then more will be wasted.  For my set of moderate size files, the average waste for clusters of size 64kB was 42.5kB (on an average file size of 387kB).</p>
+<h3>Speed</h3>
+<p style="text-align:justify;">Very small clusters are noticeably inefficient for simple copying.  For both small and large files, cluster sizes of 4096 or greater are all approximately equal in performance.  Note that the "small files" of this experiment were not especially small; the small cluster sizes may have more favourable performance when the files are closer to that size.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/10/copying1.png"><img class="aligncenter size-full wp-image-2401" title="copying" alt="" src="assets/copying1.png" height="424" width="615" /></a></p>
+<p style="text-align:justify;">For random reads, the results are less obvious.  There is some penalty for small clusters, but there is also very poor performance for the large cluster size of 32kB.  For both big and moderate files, the best cluster size for random reads is the largest, 64kB.  This goes against the expectation that large clusters have an additional cost incurred by the waste of accessing a whole cluster when only part of it is used.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/10/random-reads.png"><img class="aligncenter size-full wp-image-2402" title="random-reads" alt="" src="assets/random-reads.png" height="423" width="615" /></a></p>
+<p style="text-align:justify;">For full sequential reads of all file data, we have the interesting phenomenon that moderate sized files benefit more from large cluster sizes than do large files.  I'm not sure how to explain this; it may be due to the small sample size.  The effect is too small to conclude that cluster size makes much difference for this task.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/10/sequential-reads1.png"><img class="aligncenter size-full wp-image-2404" title="sequential-reads" alt="" src="assets/sequential-reads1.png" height="423" width="615" /></a></p>
+<h2>Conclusions</h2>
+<p style="text-align:justify;">For all tasks tested, cluster sizes smaller than the default -- those that are 512, 1024 or 2048 bytes -- are less efficient than the default size of 4kB.  As mentioned, those sizes may still pay off if very small files are to be stored on the file system.</p>
+<p style="text-align:justify;">Above the default size, larger cluster sizes confer benefit for some tasks, even for moderately sized files that may occupy only a few clusters each.</p>
+<p style="text-align:justify;">The largest cluster size of 64kB can result in 10% more space being used for the moderate sized files used in this test.</p>
+<p style="text-align:justify;">The speed differences seen in this test between the large sizes and the default size were not significant enough to recommend large sizes.  But a future experiment with more benchmark samples, larger test sets, and better experimental conditions may give clearer data.</p>
+<p style="text-align:justify;">I was curious to see whether there are <em>obvious</em> benefits to large cluster sizes.  Apparently, there are not.</p>

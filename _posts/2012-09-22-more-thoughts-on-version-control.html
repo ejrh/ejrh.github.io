@@ -1,0 +1,51 @@
+---
+layout: post
+title: More thoughts on version control
+date: 2012-09-22 13:18:35.000000000 +12:00
+categories:
+- Programming
+- Rants
+tags:
+- git
+- svn
+- version control
+- work
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_: '1'
+  _wpas_done_404107: '1'
+  tagazine-media: a:7:{s:7:"primary";s:61:"http://ejrh.files.wordpress.com/2012/09/fractal-punchcard.png";s:6:"images";a:1:{s:61:"http://ejrh.files.wordpress.com/2012/09/fractal-punchcard.png";a:6:{s:8:"file_url";s:61:"http://ejrh.files.wordpress.com/2012/09/fractal-punchcard.png";s:5:"width";i:1125;s:6:"height";i:797;s:4:"type";s:5:"image";s:4:"area";i:896625;s:9:"file_path";b:0;}}s:6:"videos";a:0:{}s:11:"image_count";i:1;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-09-22
+    01:27:59";}
+author: 
+---
+<p style="text-align:justify;">
+<p style="text-align:justify;">
+<p style="text-align:justify;">
+<p style="text-align:justify;">The shadow of <a title="Git at Wikipedia" href="http://en.wikipedia.org/wiki/Git_%28software%29">Git</a> has lately begun to loom over my programming habits. It has actually become the principal version control system at work, with most active projects migrated to it from ClearCase, Mercurial, CVS, etc. And recent collaborative programming work on my own projects (such as on the Python <a title="Coloured call graphs!" href="http://ejrh.wordpress.com/2012/08/18/coloured-call-graphs/">analysis program</a>) have made me realise that using a distributed source control system from day one can pay off if and when someone wants to fork your work.</p>
+<p style="text-align:justify;">I have been an extremely loyal <a title="Subversion at Wikipedia" href="http://en.wikipedia.org/wiki/Subversion">Subversion</a> user for almost ten years -- I started using it in November 2002. Not only has it been my main source control system for all my personal projects, documents, and general data, but it's been a satisfying outlet for some of my own version control related endeavours:</p>
+<ol style="text-align:justify;">
+<li>A few small patches I've contributed to the Subversion project.</li>
+<li>One of the first attempts at an <a title="A quick-and-dirty MySQL backend" href="http://homepages.paradise.net.nz/~ejrh/subversion/mysql/">SQL storage backend</a>.</li>
+<li>A full text repository <a title="svnindex: A Subversion repository indexer" href="http://homepages.paradise.net.nz/~ejrh/subversion/svnindex/">indexing tool</a> and database.</li>
+<li>A web-based repository browser, like ViewVC or Github (lost!).</li>
+<li>A general repository rewriting program (for retroactively fixing metadata and file contents (also lost!).</li>
+<li>A revision <a title="Notes on replaying UQM revisions into Project 6014" href="https://code.google.com/p/project6014/wiki/PortingChanges">replay script</a>, which has actually been useful for copying changes from The Ur-Quan Masters to Project 6014.</li>
+</ol>
+<p style="text-align:justify;">Even now, the Subversion command line and the <a title="TortoiseSVN at wikipedia" href="http://en.wikipedia.org/wiki/TortoiseSVN">TortoiseSVN</a> GUI for Windows are the easiest to use, most robust, and best supported version control tools I know of. I believe they were the right choice for Project 6014, even with distributed alternatives, because all of those alternatives are harder to set up, require much more understanding to use (commit vs push, pull vs fetch vs checkout), and frankly, stlll don't have the UI support. These are still important requirements, because not everyone who could benefit from version control is going to be a skilled programmer. For 90% of version control activity, Subversion just works.</p>
+<p style="text-align:justify;">Unfortunately, Subversion has the inherent limitation of centralisation. This is actually more of a problem for me as an individual user than it would be for a large corporation. I like to program both on my home computer and my netbook, and without constant network connectivity there is no way to have full source control on each. The Subversion repository would be hosted on one (the desktop computer), with a checked out working copy on the other (the netbook). Using my netbook away from home, I would be unable to view the history of the files, and unable to check in changes. I would have to wait until I had a network connection. The worst part of that is that when I made many separate changes to the source during the day, they would be checked in all once, or carefully managed by hand as temporary files to be checked in individually. That kind of tedious manual work and potential for error undermines the point of having version control.</p>
+<p style="text-align:justify;">The centralised Subversion model is still useful for a closed organisation with a good network, and its portability, simple command line, and well-polished GUIs should make it appealing to a corporate environment with users of many skill levels. Unfortunately for Subversion it scored badly against several alternatives. This was somewhat unfair as it was incorrectly deemed to fail on several requirements, but there are admittedly other weaknesses. It is somewhat inefficient, and it creates bloated and inconvenient metadata directories throughout the working copy.</p>
+<p style="text-align:justify;">And it isn't distributed, and merging is very primitive (and prone to error, when you try to do something complicated). (But from what I have seen these are unlikely to matter in our organisation.) So, Git it was. And admittedly Git is the best out of the alternatives. It's fast (in some circumstances; as I type this I'm importing 5000 files into a new repository at a rate of 1 per second). And it's distributed (if you need that, and it's better to have it available if you do). And it's the way of the future.</p>
+<p style="text-align:justify;">Unfortunately, Git is much more complicated. It is more powerful (which excuses some of the complexity), but it also has accidental complexity and has not had its interface optimised for simple, everyday use -- the way Subversion has. We also use Github at work. I sometimes wonder if it's because people didn't realise Git and Github were different things. It has proved to be a rather flaky web-based repository interface, with a confusing layout and too much focus on flashy features like dynamic page changing animations. It is good to have a centralised location of our organisation's source code (hey, it almost sounds like we're reinventing centralised version control...), and a web-based interface is the best general browsing mechanism for it. But we should remember that Git doesn't imply Github (or vice-versa), and ensure that we can continue to use version control without needing to go via the centralised location.</p>
+<p style="text-align:justify;">It is important to note that I've used Subversion for almost a decade. I am still learning Git, having only used it for some PostgreSQL hacking (implementing loose index scans) a couple of years ago (before the fire; I still have the code but it got messed up when PostgreSQL formally moved their code base to Git, and my clone of an experimental Git repository was no longer compatible with the new official one). And recently I'm been adopting it at work. So my assessment of its usability needs to be tempered by an acknowledgement of my inexperience with it. It's obvious, though, that Git will become the most popular version control system from now, and it will only get more polished and supported.</p>
+<p style="text-align:justify;">What seems to be a suboptimal choice for a corporate environment can have features that are ideal for personal use. The public Github site has free hosting (for open source), features like wikis and issue tracking, and some interesting graphs.  Mmy favourite is the punch card:</p>
+<p>[caption id="attachment_2381" align="aligncenter" width="640"]<a href="http://ejrh.files.wordpress.com/2012/09/fractal-punchcard.png"><img class="size-full wp-image-2381" title="fractal-punchcard" src="assets/fractal-punchcard.png" alt="" width="640" height="453" /></a> Tuesday seems to be the best time for fractals![/caption]</p>
+<p style="text-align:justify;">And as advertised, it's "social". One can fork a repository and be have that relationship tracked. So it's great when an open source project you want to hack on is hosted there, and you can fork it to get your own copy to work on. There are a few projects I'd like to fork and work on, which will be easier with Git (even those that aren't hosted on Github). And occasionally someone might want to fork one of mine. I would like to save them having to create an isolated copy; with a fork we can exchange improvements as each side continues development.</p>
+<p style="text-align:justify;">Furthermore, it's often said that "a Github account" is necessary for an impressive portfolio. No one says the same of "a Google Code account" but that's the power of marketing for you. Of course, it won't make an practical difference, but having put all that effort into those programs, I would appreciate some improved visibility for them. You never know what someone else might find useful.</p>
+<p style="text-align:justify;">Github has a more personal system with a page for each user, and subpages for their repositories; this will be change from the Google Code system of monolithic project pages, and gives me a change to separate my projects out into separate repositories.</p>
+<p style="text-align:justify;">So I've <a title="EJRH at Github!" href="https://github.com/ejrh/">created a new acccount</a> at Github and, with some some trepidation, I'll be moving my code into it. I'm not sure how it will work out so I'll be taking some time to learn how to best use it and evaluate its effect on my project productivity...</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>

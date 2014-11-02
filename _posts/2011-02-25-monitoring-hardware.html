@@ -1,0 +1,71 @@
+---
+layout: post
+title: Monitoring hardware
+date: 2011-02-25 19:21:51.000000000 +13:00
+categories:
+- Hardware
+- Programming
+tags:
+- cooling
+- logging
+- monitoring
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-04-19
+    06:59:26";}
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  _oembed_3a3e8ca7d1a370195efa444c7b64699c: ! '{{unknown}}'
+  _oembed_4cfd4603c334a68999a2ccadc06f1c1e: ! '{{unknown}}'
+  _oembed_c8a68b9fff8a3f0f3909b68f4f06beb1: ! '{{unknown}}'
+  _oembed_dcce31a40e8c24ebd9f9d2bec9325d92: ! '{{unknown}}'
+  _oembed_28e5076e15f32e5a820109e958a60a69: ! '{{unknown}}'
+  _oembed_ddd91cfa024b0ebe30323d7e37def851: ! '{{unknown}}'
+  _oembed_59d2e1c5f5c1c7d341a4ce2c168cdce7: ! '{{unknown}}'
+  _oembed_ff3d805d1549d032ab9f78e4cfbf86ac: ! '{{unknown}}'
+  _oembed_79bdc40237d0539495f8b60d773e5a61: ! '{{unknown}}'
+  _oembed_88a156ba2788409644cff97129603ee2: ! '{{unknown}}'
+  _oembed_9801455c14c8aeb461aa39b91c070f70: ! '{{unknown}}'
+  _oembed_05319e8fe2fc8a6de5514bc9ef070de2: ! '{{unknown}}'
+  _oembed_20169d8148013dd67c0998c0a22926bd: ! '{{unknown}}'
+  _oembed_7a75af6719838a43610f80978f443272: ! '{{unknown}}'
+  _oembed_e3a2dbb8b916adfee07b24be8907a5c1: ! '{{unknown}}'
+  _oembed_ec77ac14d98c58e0733b6e85895253bd: ! '{{unknown}}'
+  _oembed_aafb87d575c17c44aa6874857a1c5c79: ! '{{unknown}}'
+  _oembed_b21c3be5e68c14b2dc442879a2482886: ! '{{unknown}}'
+  _oembed_cff18ee78374046bb4ac8aaa2c4673fd: ! '{{unknown}}'
+  _oembed_ba5ce013bd1b69a8cd01bfa362fd2202: ! '{{unknown}}'
+author: 
+---
+<p style="text-align:justify;">I've been using <a title="PC Wizard home page" href="www.cpuid.com/softwares/pc-wizard.html">PC Wizard</a> and <a title="SpeedFan home page" href="www.almico.com/speedfan.php">SpeedFan</a> to check my machine's temperature and fans.<br />
+<!--more--></p>
+<p style="text-align:justify;">They're pretty handy but neither of them picks up all the sensors.  And as GUI applications, neither is suited to efficient data recording.  GUIs make simple usage easier at the expensive of making complicated usage harder.</p>
+<p style="text-align:justify;">While looking around for some information on APIs for getting the data, I stumbled on <a title="Open Hardware Monitor home page" href="http://openhardwaremonitor.org/">Open Hardware Monitor</a>.  This one appears to pick up <em>all </em>the sensors (that I'm aware of, anyway), and displays them in a convenient tree.  Furthermore, it's open source.  It doesn't yet have logging, but it's a popular feature request (see <a title="Log to text file issue for Open Hardware Monitoring on Google Code" href="http://code.google.com/p/open-hardware-monitor/issues/detail?id=7">their issue tracker</a>).</p>
+<p style="text-align:justify;">In the meantime I've got the source, compiled it with Visual C# Express, and hacked in some logging to a CSV file.  Every second, I get 36 metrics covering CPU clock speed, voltage, temperature, fan speed, graphics card temp, other fans, etc.  An extract:</p>
+<pre>25/02/2011 7:06:53 p.m.,ITE IT8721F,Voltage #1,Voltage,2.772
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Analog +3.3V,Voltage,3.384
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Standby +3.3V,Voltage,3.384
+25/02/2011 7:06:53 p.m.,ITE IT8721F,VBat,Voltage,3.36
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Temperature #1,Temperature,46
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Temperature #2,Temperature,26
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Fan #1,Fan,4090.909
+25/02/2011 7:06:53 p.m.,ITE IT8721F,Fan #2,Fan,1169.844
+25/02/2011 7:06:53 p.m.,AMD Phenom II X6 1090T Processor,CPU Core #1,Load,100
+25/02/2011 7:06:53 p.m.,AMD Phenom II X6 1090T Processor,CPU Total,Load,100
+25/02/2011 7:06:53 p.m.,AMD Phenom II X6 1090T Processor,CPU Core #1,Clock,3210.799
+25/02/2011 7:06:53 p.m.,AMD Phenom II X6 1090T Processor,Core #1 - #6,Temperature,36.75
+25/02/2011 7:06:53 p.m.,AMD Phenom II X6 1090T Processor,Bus Speed,Clock,200.6749
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Core,Temperature,40
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Fan,Fan,1097
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Fan,Control,22
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Core,Clock,100
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Memory,Clock,300
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Core,Voltage,0.95
+25/02/2011 7:06:53 p.m.,AMD Radeon HD 6800 Series,GPU Core,Load,5
+25/02/2011 7:06:53 p.m.,WDC WD20EARS-00MVWB0,HDD,Temperature,27</pre>
+<p style="text-align:justify;">This amounts to about 18 MB of data per hour.  1 second resolution is probably more than enough, so I'll scale it back a bit.  The idea is that it could be imported into a database for later analysis.</p>
+<p style="text-align:justify;">I should also clean up the code and post it here.  I imagine the real logging feature for OHM would take more work than this, but until that appears my patch could be useful.</p>

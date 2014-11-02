@@ -1,0 +1,51 @@
+---
+layout: post
+title: Price-time matching engine
+date: 2011-04-21 22:33:54.000000000 +12:00
+categories:
+- Programming
+tags:
+- c
+- optimisation
+- quantcup
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:59:"http://ejrh.files.wordpress.com/2011/04/queue-skip-list.png";s:6:"images";a:4:{s:55:"http://ejrh.files.wordpress.com/2011/04/free-orders.png";a:6:{s:8:"file_url";s:55:"http://ejrh.files.wordpress.com/2011/04/free-orders.png";s:5:"width";s:3:"360";s:6:"height";s:3:"227";s:4:"type";s:5:"image";s:4:"area";s:5:"81720";s:9:"file_path";s:0:"";}s:50:"http://ejrh.files.wordpress.com/2011/04/id-map.png";a:6:{s:8:"file_url";s:50:"http://ejrh.files.wordpress.com/2011/04/id-map.png";s:5:"width";s:3:"236";s:6:"height";s:3:"372";s:4:"type";s:5:"image";s:4:"area";s:5:"87792";s:9:"file_path";s:0:"";}s:59:"http://ejrh.files.wordpress.com/2011/04/queue-skip-list.png";a:6:{s:8:"file_url";s:59:"http://ejrh.files.wordpress.com/2011/04/queue-skip-list.png";s:5:"width";s:3:"658";s:6:"height";s:3:"230";s:4:"type";s:5:"image";s:4:"area";s:6:"151340";s:9:"file_path";s:0:"";}s:54:"http://ejrh.files.wordpress.com/2011/04/order-list.png";a:6:{s:8:"file_url";s:54:"http://ejrh.files.wordpress.com/2011/04/order-list.png";s:5:"width";s:3:"170";s:6:"height";s:3:"371";s:4:"type";s:5:"image";s:4:"area";s:5:"63070";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"4";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-04-21
+    11:04:33";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  _wpas_skip_linkedin: '1'
+author: 
+---
+<p style="text-align:justify;">A friend sent me a link to <a title="QuantCup home page" href="http://quantcup.org/">QuantCup</a>, which is "a quant trading themed programming contest". Now, I have little enthusiasm for high speed trading, but I am always interested in programming.<br />
+<!--more--></p>
+<p style="text-align:justify;">Their first challenge is a price-time matching engine. This is a program that receives ask and bid "limits" (offers), and matches them against existing bid/ask limits, or queues them if there are no remaining matches.</p>
+<p style="text-align:justify;">There's a <a title="Price-time matching engine spec at QuantCup" href="http://www.quantcup.org/home/spec">nice specification</a> of the problem. The contestant is to implement the functions given in a C header file; an inefficient version is provided as an example. The aim of the contest is to replace it with an optimised implementation. This is scored on both mean response time, and the standard deviation of response time.</p>
+<p style="text-align:justify;">There are three basic operations that need to be made efficient:</p>
+<ol style="text-align:justify;">
+<li>Matching an incoming limit against existing ones.</li>
+<li>Queuing an unmatched limit.</li>
+<li>Cancelling a queued limit.</li>
+</ol>
+<p style="text-align:justify;">Unfortunately, the contest is open only to students at "top universities" (the usual US suspects are cited as examples of the right kind of institution).</p>
+<p style="text-align:justify;">I've never been in a contest, but I like the idea of them. So regardless of my eligibility I've begun implementing a version of the program.</p>
+<h2>Data structures</h2>
+<p style="text-align:justify;">The data structures used are combined linked list and <a title="Skip list at Wikipedia" href="http://en.wikipedia.org/wiki/Skip_list">skip list</a>; and a hash table. The list contains price points ordered by price. Bids are at the low end, asks at the top. The two halves do not overlap, because overlapping bids and asks are matched as soon as they are entered. The price points each contain a linked list of orders, ordered be insertion time.</p>
+<p style="text-align:justify;">There is a limit to the number of live orders (MAX_LIVE_ORDERS), so the memory for these is preallocated (orders). Initially these are kept in a linked list, whose head and tail is kept in a structure (free_orders).</p>
+<p style="text-align:center;"><a href="http://ejrh.files.wordpress.com/2011/04/free-orders.png"><img class="aligncenter size-full wp-image-450" title="free-orders" src="assets/free-orders.png" alt="" width="270" height="170" /></a></p>
+<p style="text-align:justify;">Cancelling entails looking up the order id in a hash table, to find the order structure. This is then removed from the queue. The hash table maps order ids to orders. This is necessary because a sequential order id is returned when a limit is placed, and this is used in the cancel command -- if we could return pointers as ids, we could use them directly when an order is cancelled (but pointers would be reused, potentially reducing robustness in the face of repeated cancellations; whereas the example implementation, at least, handles these gracefully). At any point in time, each order is on the free list or in a hash table bin. The order ids that hash to the same bin are kept in a singly-linked list; a new order is appended to the end. This is done on the (possibly faulty) presumption that old orders are likely to be removed first.</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/04/id-map.png"><img class="aligncenter size-full wp-image-451" title="id-map" src="assets/id-map.png" alt="" width="177" height="279" /></a></p>
+<p style="text-align:justify;">Matching is done by finding the best ask/bid price point, and removing orders from it and subsequent price points as long as the incoming limit has value and the queued orders match it.</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/04/queue-skip-list.png"><img class="aligncenter size-full wp-image-452" title="queue-skip-list" src="assets/queue-skip-list.png" alt="" width="480" height="167" /></a></p>
+<p style="text-align:justify;">If the limit has value remaining after matching, a direct lookup is done to find its price point, if it exists. If not, a new price point is created and inserted into the queue, using the skip list structure. The order is appended to the end of the linked list attached to that price point.</p>
+<p><a href="http://ejrh.files.wordpress.com/2011/04/order-list.png"><img class="aligncenter size-full wp-image-453" title="order-list" src="assets/order-list.png" alt="" width="128" height="278" /></a></p>
+<p style="text-align:justify;">The major outstanding optimisation difficulty is maintaining a good skip list. Currently the height of a node in it is determined randomly, since that's easier than examining and updating the neighbours. When a node is removed nothing is done to optimise the remaining list. So it is possible for the skip list to degenerate over time.</p>
+<h2>Preliminary results</h2>
+<p style="text-align:justify;">The accompanying score program measures the latency for each order or cancel using predefined (but possibly randomly generated) sequence of about 35000 of them. The score is (mean(latency) + stddev(latency))/2, and is measured in nanoseconds. This is clearly dependent on the machine the program runs on. This is not so much an issue of fairness (since they will all be judged on the same machine), but uncertainty as to how well the competition is doing on the leader board.</p>
+<p style="text-align:justify;">On my netbook, the example program yields about 16275 and 16845 for each component, resulting in a score of 16560.</p>
+<p style="text-align:justify;">My attempt on the same machine gives about 2829 and 4051 respectively, scoring 3440. On my newer desktop, the numbers are 297 and 721, with a more respectable score of 509, which IMHO is not bad for a few hours work. I'm not sure why the standard deviation is so bad; it's fairly sporadic, too. (To get these numbers I averaged three runs; standard deviation could be double between runs.) The computation should be completely deterministic (repeatable), so this suggests an external process or OS call is occupying that time.</p>
+<p style="text-align:justify;">Of course things will be different on the judging machine, if the program ever runs there.</p>
+<p style="text-align:justify;"><strong>Footnote.</strong> In C it's easy to inadvertently write a nondeterministic (i.e. unrepeatable) program. A common example is a hash table in which the keys are pointers. If there is variation in initial conditions for things like heap and stack addresses, then pointers will be different and hash differently. For most operations this is hidden inside the hash implementation (since it will still conform to the interface of either containing an object, or not). But looping over the hash can return the items in a different order. In my case, this step was used in graph colouring, with the result that on different runs, a compiler would perform different -- but equally correct -- register allocation...</p>

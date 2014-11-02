@@ -1,0 +1,174 @@
+---
+layout: post
+title: Mandelbrot calculation using SIMD
+date: 2011-10-13 23:20:26.000000000 +13:00
+categories:
+- Programming
+- Science
+tags:
+- fractal
+- mandelbrot
+- optimisation
+- simd
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-10-13
+    10:27:07";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  _oembed_30c82e5519f062e4be2a3fdd872a12e4: ! '{{unknown}}'
+  _oembed_b25f22eea05cbb815d89c96b4e84c0fa: ! '{{unknown}}'
+  _oembed_22165f539cba0adb87121083a4b13b34: ! '{{unknown}}'
+  _oembed_f18334a970c95554cb7f8354088e2a43: ! '{{unknown}}'
+  _oembed_3ee20e4b92c87e59c6c97ac46bfb4abd: ! '{{unknown}}'
+  _oembed_5e6060ad13f9f9050a05f6aab593ffbd: ! '{{unknown}}'
+  _oembed_c9627a85854c4f282531227628d8f92b: ! '{{unknown}}'
+  _oembed_dd817c05ea9ac0242e6572d1645bbaba: ! '{{unknown}}'
+  _oembed_1a2564ef9ec8af8640d41f8556012589: ! '{{unknown}}'
+author: 
+---
+<p style="text-align:justify;">How running two calculations in a single thread can speed up the Fractal by up to 90% (but more likely, 15%...).<br />
+<!--more--></p>
+<p style="text-align:justify;">My friend <a title="Kris's home page" href="http://www.punk.co.nz/">Kris</a> suggested using SIMD for the <a title="Tracing a fractal outline" href="http://ejrh.wordpress.com/2011/10/07/tracing-a-fractal-outline/">fractal calculations</a>. He has previously programmed with it, using it (in integer mode) for MD5 calculation.</p>
+<p style="text-align:justify;">By way of background, <a title="SIMD at Wikipedia" href="http://en.wikipedia.org/wiki/SIMD">SIMD</a> (Single Instruction Multiple Data) instructions are a feature provided by some processors (including modern x86 ones). They work on vectors of data, performing the same operation in parallel on every component of the vector. For example, in my case the vectors are of size 128 bits, which is large enough to hold two double precision floating point numbers. If I need to perform E = A*B and F = C*D, I can load (A, C) into one vector, and (B, D) into another, and then perform a single multiplication instruction, yielding the vector (E, F).</p>
+<p style="text-align:justify;">There is some overhead of packing and unpacking the values from the vectors, but if most of the computation is in the form of simple arithmetic operations, SIMD on vectors of size N can improve speed by a factor approaching N. It's most easy to apply if you have a number of reasonably long parallel computations on independent elements: you just pack N of them at a time into vectors, perform the computation, and then unpack the results.</p>
+<h2>SIMD'ing the Mandelbrot</h2>
+<p style="text-align:justify;">But how can we apply it to the Mandelbrot fractal? We have a large number of pixels to compute; the problem is some pixels take longer than others, and we don't know which ones that will be until we try them. The core function is:</p>
+<p>[sourcecode language="c"]int mfunc(int max_iterations, double cx, double cy)<br />
+{<br />
+    /* Inputs are inputs max_iterations, and the pixel coordinates (cx, cy). */<br />
+    double zr = 0, zi = 0;<br />
+    double zr2 = 0, zi2 = 0;<br />
+    int i = 0;</p>
+<p>    /* Loop up to max_iterations times, or until boundary is reached. */<br />
+    while (i &lt; max_iterations &amp;&amp; zr2 + zi2 &lt; 2.0*2.0)<br />
+    {<br />
+        double t;</p>
+<p>        zr2 = zr*zr;<br />
+        zi2 = zi*zi;<br />
+        t = zr*zi;<br />
+        zr = zr2 - zi2 + cx;<br />
+        zi = 2*t + cy;</p>
+<p>        i++;<br />
+    }</p>
+<p>    /* Output is the value for this pixel. */<br />
+    return i;<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">We could try to adapt it to do two pixels in parallel. But one will likely finish sooner than the other, so the function would need to check for this, save that pixel's output, then continue the computation until the other pixel has finished. This sounds like a mess, and it feels wasteful.</p>
+<p style="text-align:justify;">So initially, I thought about grouping the individual steps into pairs that can be done in parallel. Something like:</p>
+<p>[sourcecode language="c"]<br />
+    zr2 = zr*zr;  zi2 = zi*zi;         /* Two independent multiplications -- easy. */<br />
+    t = zr*zi;  zi2neg = zi2 * -1;   /* One left over; also negate zi2 while we have the chance. */<br />
+    zr = zr2 + zi2neg;  zi = t + t;  /* So that we can turn a subtraction into an addition.  Turn multiplication by 2 into addition, too. */<br />
+    zr = zr + cx;  zi = zi + cy;      /* Finally add constants. */[/sourcecode]</p>
+<p style="text-align:justify;">We've turned 7 computations (in the original 5 lines) into 4. But we still need to perform the comparison with the boundary value.</p>
+<p style="text-align:justify;">I never implemented the above, because Kris said, "how about something like this:"</p>
+<p>[sourcecode language="c"]void mfunc(int max_iterations, FUNC next_pixel, FUNC output_pixel)<br />
+{<br />
+    while (1)<br />
+    {<br />
+        if (component 0 is done)<br />
+        {<br />
+            output_pixel(component 0);<br />
+            component 0 = next_pixel();<br />
+        }</p>
+<p>        if (component 1 is done)<br />
+        {<br />
+            output_pixel(component 1);<br />
+            component 1 = next_pixel();<br />
+        }</p>
+<p>        do computations using SIMD<br />
+    }<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">In other words, <em>do</em> run two pixel computations in parallel, but when one finishes, output it and start a new calculation in its place. (I'm paraphrasing Kris's pseudocode a bit here. He also predicted that it would end up getting and outputting the pixels itself rather than using callbacks. After all, the point of using SIMD is low-level optimisation, and function call overhead could be significant. And callbacks can't be inlined.)</p>
+<h2>Implementation and results</h2>
+<p style="text-align:justify;">The above scheme has been implemented in <a title="mfunc.c source code on Edmund's Projects" href="http://code.google.com/p/ejrh/source/browse/trunk/fractal/mfunc.c">mfunc.c</a>. It's currently supported only by the SIMPLE drawing mode, but it should be useable by the others. As an aside, my favourite drawing mode, TRACE, is almost 9 times as slow as SIMPLE; <a title="Amdahl's law at Wikipedia" href="http://en.wikipedia.org/wiki/Amdahl%27s_law">Amdahl's law</a> therefore implies a theoretical 5% speedup from using SIMD on the pixel calculations. TRACE spends most of its time maintaining its priority queue. There's room for optimisation there: every movement of an element up or down the heap is done by a call to memmove, even though elements are relatively small -- 12 bytes. And that size could be further reduced. (An element contains a priority, and the pixel coordinates. If we really wanted to compress them, we could use 12 bits each for x and y, leaving an ample 8 bits for priority. Packing them into a single word with the priority at the high end means we could manipulate them by ordinary value assignment rather than block memory moves.) The advantages of TRACE mode are that a) it fills in the interesting areas first, b) it can flood fill the empty bits, and c) it's way more interesting to watch.</p>
+<p style="text-align:justify;">After implementing SIMD, casual measurements of the PPM in the graphical display showed a speedup of about 15%. I then implemented a proper benchmark mode. With a command line like <code>fractal --benchmark --mode SIMPLE_SIMD</code>, the program will run 5 iterations of a standard benchmark (2000x2000, depth 256), without doing anything graphical.</p>
+<p>The results were:</p>
+<table>
+<tbody>
+<tr>
+<th>Mode</th>
+<th>Pixels per second</th>
+</tr>
+<tr>
+<td>SIMPLE</td>
+<td>870938</td>
+</tr>
+<tr>
+<td>SIMPLE_LOOP</td>
+<td>773687</td>
+</tr>
+<tr>
+<td>SIMPLE_SIMD</td>
+<td>1021408</td>
+</tr>
+<tr>
+<td>PARALLEL</td>
+<td>1849903</td>
+</tr>
+<tr>
+<td>TRACE</td>
+<td>86168</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">So: implementing SIMD has rewarded us with a 32% speed boost over ordinary double arithmetic. Somehow I was expecting more! I guess a lot of it is eaten by the parts of the code that aren't yet parallelised.  The other rest of the expected gain may have been consumed by different costs of the SIMD version compared to the scalar version (I have not researched the official costs of these instructions, rather relying on overall benchmarking like this).  We could use 4 single precision components per vector, but I prefer to have the extra precision for accuracy in highly-zoomed-in fractals. (Note: it's definitely worth investigating this, and determining the zoom level at which double precision really matters).</p>
+<h2>Optimising it</h2>
+<p style="text-align:justify;">I've done a bit of work since, trying to optimise that inner loop.</p>
+<p style="text-align:justify;">I've made a smaller benchmark, consisting only of the <code>mfunc</code> functions with some stub <code>next_pixel</code> and <code>output_pixel</code> functions. Both MSVC and GCC have options to compile to assembly code, so I've been poring over that. It can be pretty hard to follow -- GCC in particular will move code all over the place. MSVC has an option to annotate the assembly code with the original C source code, which helps (some code motion still occurs, however).</p>
+<p>The mfunc_simd function has a particular shape:</p>
+<p>[sourcecode language="c"]int mfunc_loop<br />
+{<br />
+    while (1)<br />
+    {<br />
+        if (check 1)   /* Only succeeds about once in a thousand times. */<br />
+            ....<br />
+        if (check 2)   /* Only succeeds about once in a thousand times. */<br />
+            ....</p>
+<p>        mandelbrot computations   /* Occurs every iteration; SIMD goes here. */<br />
+    }<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">We know from general knowledge about the Mandelbrot set, and from the typical usage of the program, how often various parts of the code are likely to be executed. (Profiling is always a good way to test these predictions; it's less useful when we get down to this low a level of optimisation.) Unfortunately the compiler doesn't have this level of knowledge. It can figure some things by analysis (e.g. two instructions are in the same loop, so are both called the same number of times); and it may have heuristics (e.g. an instruction is inside a conditional statement, so may be called less often than one outside). Compilers can often recognise certain loop forms (like iteration of a constant integer range). Some compilers can even do clever stuff like <a title="Data flow analysis and regular expressions" href="http://ejrh.wordpress.com/2011/05/22/data-flow-analysis-and-regular-expressions/">simulating every possible execution</a> and proving useful things about program behaviour.</p>
+<p style="text-align:justify;">But they can't prove arbitrary mathematical things about non-terminating complex transformations; and they don't have access to outside information (not even Wikipedia!); and you can't expect them to read your mind to know how you intend to use a program. My concern was that the compiler would optimise the code inside the checks at the expense of the main computation. In particular, I don't want it to spend a register on a variable that's only used in there. It's more important (about 1000 times as important) that the variables used in the main computation are all in registers.</p>
+<p style="text-align:justify;">Unfortunately the compiler wasn't using registers as much as it could in that code. A reasonable (but simple) heuristic for code execution frequency is loop nesting depth. But nesting within a conditional makes code less likely to execute. A possible fix in this case is to put the main computations in their own special loop, which terminates when any of those check conditions are true. (When that happens, the checks and their accompanying code can be run, and if they don't cause the function to exit, the outer loop will repeat.)</p>
+<p style="text-align:justify;">Another obvious (but probably insignificant) optimisation is the counter variables <code>i0</code> and <code>i1</code>. For most iterations, they will both be incremented, and neither will have reached the limit. We can replace them with a single counter in the inner loop, and do the bookkeeping and checking on the distinct counters outside it. Interestingly, this move the counter to a register for the entire inner loop. (Integer registers are not in high demand in this function, so it's strange that the compiler was not already using them effectively.)</p>
+<p style="text-align:justify;">The next change was at the point of testing the boundary conditions. Extracting data from SIMD vectors can be done in two ways. We can keep the vector in a C union with scalar (e.g. double, or long) variables. Conversion is done by forcing the data into memory as a vector, then reading it back out as a scalar. Or, we can use SIMD functions to extract components of it. Being new to SIMD programming I had defaulted to the first method (the <a title="SSE compiler intrinsics as MSDN" href="http://msdn.microsoft.com/en-us/library/y0dh78ez%28v=VS.80%29.aspx">Streaming SIMD documentation</a> can be daunting; there are lots of useful functions in there but it takes insight and research to find them). But it turns out there was a function for extracting the sign bits of a vector's components into a simple integer. This was exactly what I wanted to check whether either of those components had exceeded the boundary.</p>
+<p style="text-align:justify;">One last optimisation mystifies me a bit. We exit the inner function as soon as the counter variable expires, thus avoiding doing the boundary calculations. But then we do the boundary calculations immediately outside that loop because we need the data. Just as much work gets done either way, but the second way is reliably slightly faster!</p>
+<p style="text-align:justify;">An "optimisation" I experienced with was replacing the short-circuiting boolean operation <code>||</code> with a bitwise one <code>|</code>. The first operation would generate an branch in the middle of the loop, which I worried could hinder the CPU's branch prediction. (I've read stories of highly optimised graphics code simulating conditional code using bitwise arithmetic instead of branches.) But that change made the function slower, so I've removed it.</p>
+<p style="text-align:justify;">I have not included the changes in the main program; but post-optimisation, the smaller SIMD test yields these figures:</p>
+<table>
+<tbody>
+<tr>
+<th>Mode</th>
+<th>MSVC</th>
+<th>GCC (Cygwin)</th>
+</tr>
+<tr>
+<td>LOOP</td>
+<td>19870</td>
+<td></td>
+</tr>
+<tr>
+<td>SIMD (original)</td>
+<td>35359</td>
+<td>37493</td>
+</tr>
+<tr>
+<td>SIMD (optimised)</td>
+<td>36385</td>
+<td>37514</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">(For some reason the LOOP implementation doesn't perform the same computation in GCC. It could be a compiler bug, but is far more likely to be due to relying on undefined behaviour.)</p>
+<p style="text-align:justify;">In MSVC, the SIMD speedup (over LOOP) climbed from 78% to 83%. (Note that this test ran at a much higher depth than the benchmark; more time is spend in the main calculation, so SIMD speedups are more noticeable.)</p>
+<p style="text-align:justify;">In GCC, there was little change. Note that GCC already does a slightly better optimisation job on the SIMD, though.</p>
+<p style="text-align:justify;">Was it worth it? Contrary to my earlier estimates of a measly 15% speedup, I've shown that SIMD provides almost an 80% speedup. And we can improve it slightly with a few code changes. More usefully, I've explored different SIMD usage decisions (e.g. in-memory unions vs extraction functions), and program structure.</p>
+<p style="text-align:justify;">I haven't applied these optimisations to the main program yet. When I will, I'll expand the benchmark functionality and do some more testing to determine what the speedup is in various common scenarios (zoomed out, zoomed in on detail, zoomed in on edge).</p>
+<p style="text-align:justify;">This was my first foray into SIMD programming! It can be tricky, but it's not impossible. And there are plenty of other, non-fractal, applications for it.</p>
+<p style="text-align:justify;">Once again, the fractal work is hosted at <a title="Fractal source code on Edmund's Projects" href="http://code.google.com/p/ejrh/source/browse/trunk/fractal/">my project on Google Code</a>, and there is a <a title="Fractal binary for Windows" href="http://code.google.com/p/ejrh/downloads/detail?name=Fractal-2011-10-13-windows.zip">binary package for Window</a>s.  The latest binary includes the benchmark, and the next release will include the SIMD test code.</p>

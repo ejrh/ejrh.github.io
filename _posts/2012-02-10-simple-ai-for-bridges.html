@@ -1,0 +1,43 @@
+---
+layout: post
+title: Simple AI for bridges
+date: 2012-02-10 19:53:01.000000000 +13:00
+categories:
+- Games
+- Programming
+tags:
+- ai
+- bridges
+- math
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-02-10
+    06:58:20";}
+author: 
+---
+<p style="text-align:justify;">I finally overcame several weeks of programmer's block on the train this evening, by writing the AI for the <a title="Bridges game" href="http://ejrh.wordpress.com/2011/12/20/bridges-game/">bridges game</a>.<br />
+<!--more--></p>
+<p style="text-align:justify;">The game is solved by building bridges between nodes until all nodes have the correct number of bridges coming out of them. (There are some other conditions such as connectedness and acyclicity (is that a new word?), but the AI conservatively ignores those and cannot use them to infer anything as yet.) In each iteration, the AI finds a node and attempts to make progress in solving that node locally.</p>
+<p style="text-align:justify;">The AI has only one rule: the <a title="Pigeonhole principle" href="http://en.wikipedia.org/wiki/Pigeonhole_principle">pigeonhole principle</a>. Each bridge slot around a node has a certain maximum additional value, which is the least of:</p>
+<ul style="text-align:justify;">
+<li>The remaining charge on the target node in that direction.</li>
+<li>The maximum bridge thickness (i.e. 2) minus the current bridge thickness.</li>
+<li>0, if no bridge can be built there due to obstruction by other bridges, or absence of a target node in that direction.</li>
+</ul>
+<p style="text-align:justify;">If, for any slot, the sum of the other slots' values is not enough to satisfy the remaining charge on the node, then this slot must have a bridge built (or thickened).</p>
+<p style="text-align:justify;">Using this rule, the AI will not itself built erroneous bridges. But it is also possible for the human to work in concert with (or maliciously against) the AI. If erroneous bridges are built then the AI will attempt to use that incorrect information in inferring additional bridges, so it can all go spectacularly wrong.</p>
+<p style="text-align:justify;">If a depth-first ability is implemented, as was done for the <a title="Depth-first logic game AI" href="http://ejrh.wordpress.com/2011/05/12/depth-first-logic-game-ai/">network game</a>, it will be necessary to detect such inconsistencies. Again, there are three sources of them:</p>
+<ol style="text-align:justify;">
+<li>Incorrect guesses by the AI, from which it can backtrack.</li>
+<li>Human interference.</li>
+<li>Bugs in the AI.</li>
+</ol>
+<p style="text-align:justify;">Assuming that only the first case occurs, and that the AI can eventually detect such a mistake, it will eventually solve the board. Detecting the mistake can be done by examining the victory conditions, which are: no trolls (i.e. no excess bridges round a node), no cycles, and a single connected component.</p>
+<p style="text-align:justify;">Having written these two games, I'm starting to notice reusable parts common to both, in both the GUI/controller and the AI. The next step might be to factor them out into a general simple-pygame-logic-game framework to be used by both.</p>

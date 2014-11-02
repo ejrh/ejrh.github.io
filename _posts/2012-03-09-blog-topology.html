@@ -1,0 +1,33 @@
+---
+layout: post
+title: Blog topology
+date: 2012-03-09 17:13:22.000000000 +13:00
+categories:
+- Programming
+- Reflections
+tags:
+- blogging
+- graph theory
+- wordpress
+- xslt
+- yed
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+  tagazine-media: a:7:{s:7:"primary";s:58:"http://ejrh.files.wordpress.com/2012/03/blog-topology4.png";s:6:"images";a:1:{s:58:"http://ejrh.files.wordpress.com/2012/03/blog-topology4.png";a:6:{s:8:"file_url";s:58:"http://ejrh.files.wordpress.com/2012/03/blog-topology4.png";s:5:"width";s:4:"3769";s:6:"height";s:4:"2609";s:4:"type";s:5:"image";s:4:"area";s:7:"9833321";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"1";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-03-09
+    09:26:59";}
+  _wpas_done_linkedin: '1'
+author: 
+---
+<p style="text-align:justify;">Yesterday I had someone comment favourably on the "linkage" in my blog. Generally when I write a post, I try to refer back to one or two existing posts on the same topic. So in theory, there is an ever-growing <a title="Hasse diagram at Wikipedia" href="http://en.wikipedia.org/wiki/Hasse_diagram">Hasse diagram</a> of posts. In practice, it's nothing so pretty:</p>
+<p>[caption id="attachment_1865" align="aligncenter" width="640" caption="Internal link structure of EJRH"]<a href="http://ejrh.files.wordpress.com/2012/03/blog-topology4.png"><img class="size-full wp-image-1865" title="blog-topology" src="assets/blog-topology4.png" alt="" width="640" height="443" /></a>[/caption]<br />
+<!--more--></p>
+<p style="text-align:justify;">The hexagonal EJRH node is the home page, and it links to the categories (ellipses) and pages (rounded rectangles). Posts are rectangles and are linked according to their <a title="Pingbacks in WordPress" href="http://en.support.wordpress.com/pingbacks/">pingbacks</a>. Pingbacks are normally inter-blog, but the major commenter on my own posts is me by way of other posts.</p>
+<p style="text-align:justify;">When I see components of one or two isolated posts, I feel a strong urge to retroactively connect them to something.  At least the graph has the property of planarity, even if it's not drawn that way.</p>
+<p style="text-align:justify;">The diagram was drawn with yEd, using data generated from the WordPress export file and processed with a stylesheet into <a title="GraphML home page" href="http://graphml.graphdrawing.org/">GraphML</a>. The stylesheet also draws links from the categories to their constituent posts, but that makes the diagram really messy.</p>
+<p style="text-align:justify;">The graph above is just an image, but in yEd the nodes are also hyperlinks to their respective blog locations; perhaps there's a way to integrate it into WordPress...</p>
+<p style="text-align:justify;">

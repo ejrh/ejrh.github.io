@@ -1,0 +1,84 @@
+---
+layout: post
+title: Compiler
+date: 2012-03-01 09:28:58.000000000 +13:00
+categories:
+- Programming
+tags:
+- c
+- compiler
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";s:1:"0";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-03-01
+    08:29:29";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">A <a title="Compiler at Wikipedia" href="http://en.wikipedia.org/wiki/Compiler">compiler</a> has always seemed to me to be one of the supreme examples of a serious computer program. It operates on other programs, translating them from one language to another. It must simultaneously work with high-level concepts, and manipulate low-level data. Although a basic batch program, it has many stages and numerous possibilities for optional improvements.</p>
+<p style="text-align:justify;">For a long time, it has been my ambition to write one.<br />
+<!--more--></p>
+<p style="text-align:justify;">Unlike many compiler writers, my goal isn't to implement a new language, or explore new compilation techniques, or write a better compiler. I'm aiming simply to write a compiler, for fun and learning. I do not expect to invent anything new or better, except in the subjective senses that it will be new to me, and better for my understanding of compilers.</p>
+<h2>Source language</h2>
+<p style="text-align:justify;">The source language is called E, and has no formal definition. It's an imperative, C-like language. Sometimes when you describe a language as C-like, people assume it has <em>all</em> the warts of C. In my case, in a discussion of control structures, it was assumed that E had <code>goto</code>s. Well, it doesn't. It doesn't even have <code>for</code>-loops (yet).</p>
+<p style="text-align:justify;">E is C-like in that it uses <code>{</code> and <code>}</code> for blocks and <code>;</code> as a statement separator. It has declarations of the form <code>int x</code> or <code>int f(int y, int z) { ... }</code>.</p>
+<p style="text-align:justify;">But it has no pointers, no typedefs, and no preprocessor. Instead, it has tuples, function types, and closures.  Here's an actual working example, a factorial function using <a title="Continuation-passing style at Wikipedia" href="http://en.wikipedia.org/wiki/Continuation-passing_style">continuation passing style</a>:</p>
+<p>[sourcecode language="c"]int factorial_cps(int x, (int -&gt; int) c)<br />
+{<br />
+    if (x &lt;= 1)<br />
+    {<br />
+        return c(x);<br />
+    }<br />
+    else<br />
+    {<br />
+        int old_x = x;<br />
+        (int -&gt; int) old_c = c;<br />
+        return factorial_cps(x - 1, int lambda(int y) {<br />
+            return y * old_c(old_x);<br />
+        });<br />
+    }<br />
+}</p>
+<p>public int factorial(int x)<br />
+{<br />
+    return factorial_cps(x, int lambda(int x) { return x; });<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">Why is it mucking around with <code>old_x</code> and <code>old_c</code>? That's a workaround for a compiler bug, which I will describe since I'm quite proud of the fact my compiler is advanced enough to have interesting bugs.</p>
+<ol style="text-align:justify;">
+<li>The recursive call to <code>factorial_cps</code> on line 11, is a tail call; the caller returns directly after calling it.</li>
+<li>The compiler optimises this by inserting an assignment of the call's arguments to the functions variables <code>x</code> and <code>c</code>, followed by a <code>restart</code> instruction. This instruction translates to an edge in the CFG leading back to the top of the function.</li>
+<li>Since the parameter list to the function is just a tuple, the assignment (without the workaround) would look like: <code>(x, c) = (x - 1, int lambda(int y){...});</code></li>
+<li>Unfortunately the source expressions in the tuple overlap the destination expressions; in particular the second argument (the closure) makes use of <code>x</code> and <code>c</code>. Depending on what mood it's in, the compiler could happily generate the code to overwrite one of those variables before it generates the closure creation.</li>
+<li>Consequently the closure will lose track of the input variable's original values; it won't operate on the correct value of <code>x</code>, and it could (conceivably) call itself rather than the passed in closure <code>c</code>!</li>
+</ol>
+<p style="text-align:justify;">I have a plan to fix it, as described in the <span style="text-decoration:line-through;">procrastination list</span> <a title="Supporting tuples (outstanding compiler issue)" href="http://code.google.com/p/ejrh/issues/detail?id=34">issue tracker</a>.</p>
+<h2>Parsing</h2>
+<p style="text-align:justify;">The first major stage of compilation is parsing. Parsing, in most compilers, is the translation of a human-readable text-based program into a symbolic representation of the program: an abstract syntax tree.</p>
+<p style="text-align:justify;">Parsing has historically been considered a major topic in compilation. The parser generator YACC is "Yet Another Compiler Compiler". The cover of the famous <a title="Dragon Book at Wikipedia" href="http://en.wikipedia.org/wiki/Principles_of_Compiler_Design">Dragon Book</a> is illustrated by the knight of "LALR parser generator" battling a dragon called "Complexity of Compiler Construction".</p>
+<p style="text-align:justify;">Yet I have discovered that parsing is only a small and relatively easy bit of writing a compiler! Admittedly, I use Bison (a GNU version of YACC), so perhaps it's easy because YACC has done the hard work for me.</p>
+<p style="text-align:justify;">There were still a few interesting problems:</p>
+<ol style="text-align:justify;">
+<li>Proper precedence of operators. YACC can do most of this for you using built in precedence indications, but I opted to do it using a hierarchy of nonterminals, each of which corresponds to a precedence level.  For example, to have <code>a * b + c * d</code> parsed using the standard convention, the grammar defines a <var>sum</var> nonterminal as either a <var>product</var>, or a <var>product</var> <code>*</code> a <var>product</var>. <var>product</var> itself is defined similarly in terms of <var>atom</var>, which is either a single name or constant, or an expression in brackets.</li>
+<li>Nesting of <code>if</code>/<code>else</code> statements. I used the technique from <a title="The Dangling Else by Robert Heckendorn" href="http://marvin.cs.uidaho.edu/~heckendo/CS445/danglingElse.html">this excellent page</a>.</li>
+<li>Differentiating declarations from expressions.</li>
+<li>Recovering from syntax errors so that other errors in the input can be picked up and reported too.</li>
+</ol>
+<p style="text-align:justify;">I've not yet solved the last two.  For item 3, my understanding of the usual technique is that the lexer will identify a name as a type name, and return a terminal to that effect, rather than a terminal for a variable name.</p>
+<p style="text-align:justify;">Regarding item 4, the compiler would benefit from a general mechanism for collecting errors and reporting them.  Another tricky part of this is storing the input location (line number) of a problematic node -- sometimes it may not be obvious because code can move around significantly during compilation.</p>
+<h2 style="text-align:justify;">Current status</h2>
+<p style="text-align:justify;">The compiler is currently broken!  I started making changes to the register allocator and then got sidetracked for a few months.  I have lots of ideas though (see the <a title="Compiler issues" href="http://code.google.com/p/ejrh/issues/list?can=1&amp;q=subproject%3DCompiler">issue list</a>).</p>
+<p style="text-align:justify;">Choosing C for the compiler's implementation language felt natural at the time.  I don't worry about garbage collection much -- I have vague plans to use <a title="Hans Boehm's garbage collector page" href="http://www.hpl.hp.com/personal/Hans_Boehm/gc/">Boehm</a> at some stage -- but even so pointer errors are not uncommon.  The main programming difficulty is remembering to maintain the numerous fields that nodes can contain.  For instance, an expression node might be created in a compiler stage to store a temporary.  What is the line number of that temporary?  It needs to be copied from whichever expression impels its creation.  What about the type?  That needs to be set too, otherwise something will crash later on.</p>
+<p style="text-align:justify;">I have often forgotten things like that and had to track down obscure bugs.  I wonder whether a language with stronger types and more static analysis would help?</p>
+<p style="text-align:justify;">Interesting things I might blog about in future (even though they don't entirely work):</p>
+<ul style="text-align:justify;">
+<li>Some interesting conundrums with implementing closures in a low-level language.</li>
+<li>How the register allocater works (or is supposed to).  (See my StackOverflow question <a title="Register allocation and spilling, the easy way? on StackOverflow" href="http://stackoverflow.com/questions/1960888/register-allocation-and-spilling-the-easy-way">Register allocation and spilling, the easy way</a> for some insights into the direction I was taking it.)</li>
+<li>Various CFG operations: building it from the AST; inlining CFGs; optimising tail-calls; emitting it as assembly language.</li>
+<li>The DFA implementation and its current (and possible) uses.</li>
+<li>The node class hierarchy and its convoluted implementation in C.</li>
+</ul>
+<p style="text-align:justify;">I can't hope to contribute much to compiler theory, or even to provide much practical knowledge for other compiler writers, but hopefully I can describe some of the interesting problems that arise from it, and impart some enthusiasm for the topic.  After all, compilers occupy a special niche in computer science: they are programs whose inputs are programs, and whose outputs are programs.  Understanding them is essential to a complete understanding of computers.</p>
+<p style="text-align:justify;">

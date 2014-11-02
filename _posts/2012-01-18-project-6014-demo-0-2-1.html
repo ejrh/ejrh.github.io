@@ -1,0 +1,70 @@
+---
+layout: post
+title: Project 6014 demo 0.2.1
+date: 2012-01-18 21:37:25.000000000 +13:00
+categories:
+- Games
+- Project 6014
+tags:
+- graphics
+- python
+- star control ii
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wp_old_slug: 116project-6014-demo-0-2-1
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:54:"http://ejrh.files.wordpress.com/2012/01/orz-nebula.jpg";s:6:"images";a:1:{s:54:"http://ejrh.files.wordpress.com/2012/01/orz-nebula.jpg";a:6:{s:8:"file_url";s:54:"http://ejrh.files.wordpress.com/2012/01/orz-nebula.jpg";s:5:"width";s:4:"1298";s:6:"height";s:4:"1005";s:4:"type";s:5:"image";s:4:"area";s:7:"1304490";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"2";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-01-18
+    08:38:36";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Has been released -- <a title="Download Project 6014 demo 0.2.1" href="http://code.google.com/p/project6014/wiki/Downloads?tm=2">download it here</a>!<br />
+<!--more--></p>
+<p style="text-align:justify;">It fixes the common issues encountered in 0.2. But it's as much a feature release as it is a patch. There have been many graphical tweaks. One of the most noticeable additions is nebulae in space:</p>
+<p>[caption id="attachment_1631" align="aligncenter" width="640" caption="Paying a visit to the engmatic Orz"]<a href="http://ejrh.files.wordpress.com/2012/01/orz-nebula.jpg"><img class="size-full wp-image-1631" title="orz-nebula.jpg" src="assets/orz-nebula.jpg" alt="" width="640" height="495" /></a>[/caption]</p>
+<p style="text-align:justify;">Pretty cool! They also appear on the awesome Starmap by Joris and Damon, which makes me wish I could print off a glossy wall-sized poster:</p>
+<p>[caption id="" align="alignnone" width="640" caption="Project 6014 StarMap, red edition"]<img class=" " src="assets/project_6014_starmap___red_by_dczanik-d4mnqac.png" alt="" width="640" height="797" />[/caption]</p>
+<p style="text-align:justify;">There are also great improvements to the new ships, and some new voice acting.</p>
+<p style="text-align:justify;">The team has been pretty much working round the clock to create the packages for Windows, Linux and OSX.  At this moment we're still fixing a couple of problems with the final Windows package.  In the meantime, there is a cool trailer on YouTube (made by Damon):</p>
+<p style="text-align:justify;">[youtube=http://www.youtube.com/watch?v=lQBQYi88AAI]</p>
+<p style="text-align:justify;">Below are some comments on a particular issue I've done some work on.</p>
+<h2>Content increases, so does download size</h2>
+<p style="text-align:justify;">One difficulty is the increasing size of the packages. We support UQM's "original" 320x240 (it was 320x200 in the original SC2 DOS game) resolution, a 2x resize, and a 4x resize. The number of pixels increases with the square of the resolution, so the 2x has four times as many as the original, and the 4x has 16 times as many. The size of the corresponding content UQMs appears to increase linearly (i.e. with the square root of the number of pixels):</p>
+<table>
+<tbody>
+<tr>
+<th>Resolution</th>
+<th>Total pixels</th>
+<th>File size</th>
+<th>New size</th>
+</tr>
+<tr>
+<td>Original</td>
+<td> 24 Mpixel</td>
+<td>44 MB</td>
+<td>(incompressible)</td>
+</tr>
+<tr>
+<td>Hires 2x</td>
+<td>67 Mpixel</td>
+<td>116 MB</td>
+<td>92 MB</td>
+</tr>
+<tr>
+<td>Hires 4x</td>
+<td>284 Mpixel</td>
+<td>223 MB</td>
+<td>196 MB</td>
+</tr>
+</tbody>
+</table>
+<p style="text-align:justify;">This probably alludes to some interesting fact about image encoding theory. In any case, 200 MB is pushing the limits of Google Project Hosting, with the annoying result that the last package has to be split in two and manually recombined by the user, if they download from Google.</p>
+<p style="text-align:justify;">One attempt at reducing the file size was to recode some of the PNGs as JPGs within the content files. I wrote <a title="UQM compression script for Project 6014" href="http://code.google.com/p/project6014/source/browse/trunk/tools/compress_uqm/compress_uqm.py">a script</a> to do this automatically (also see <a title="UQM image recompression script in Project 6014 issue tracker" href="http://code.google.com/p/project6014/issues/detail?id=57">the issue</a>).  The approximate criteria for "compressible" images are: reasonably large, no significant transparency, and a reasonable reduction in size.  Many images in the game are sprites for ships, stars, creatures, which rely on transparency; JPG does not easily support transparency.  But there are also some large, normal images such as slide shows, comm screens, and planet surfaces which compress well.</p>
+<p style="text-align:justify;">Unfortunately with the rush to package the content, then to create the installer (which is dependent on the MD5s of the content files), we only had time to apply this to the 2x resize. The resulting file was 20% smaller. Expecting a similar improvement in the case of 4x, we make it small enough to fit in a single file on Google.</p>
+<p style="text-align:justify;">In the longer term, the size of the content will probably double; if Google does not increase the limit then I expect we will rely more on external mirrors. But an optimised size does make the game a slightly better proposition as a download for a new player. In some countries (New Zealand), a several hundred MB demo is still a moderately large investment of time and bandwidth.  There is a surprisingly large SC2 fan base in those places, so we should make things easy for them if we can.</p>
+<p style="text-align:justify;">Eventually, it may be just be easiest to split the 4x content into two or more addons, all of which are required when 4x mode is enabled.  Files of size 100-200 MB are easier to reliably download and manage.  As long as they don't proliferate having a couple of extra files should not inconvenience anyone.  Having dozens or hundreds could be annoying, but is unlikely unless we end up with a full 3D HD extended edition directors cut.</p>
+<p style="text-align:justify;">

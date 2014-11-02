@@ -1,0 +1,63 @@
+---
+layout: post
+title: Not a Julia set!
+date: 2011-04-16 01:13:12.000000000 +12:00
+categories:
+- Programming
+- Science
+tags:
+- c
+- fractal
+- julia
+- mandelbrot
+- openmp
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:55:"http://ejrh.files.wordpress.com/2011/04/not-a-julia.png";s:6:"images";a:1:{s:55:"http://ejrh.files.wordpress.com/2011/04/not-a-julia.png";a:6:{s:8:"file_url";s:55:"http://ejrh.files.wordpress.com/2011/04/not-a-julia.png";s:5:"width";s:4:"1920";s:6:"height";s:4:"1080";s:4:"type";s:5:"image";s:4:"area";s:7:"2073600";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"1";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-05-08
+    08:22:43";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Following my <a title="Fractals" href="http://ejrh.wordpress.com/2011/04/15/fractals/">previous post</a>, I put together a primitive Mandelbrot explorer.  Rambling through the Mandelbrot landscape, I found this:</p>
+<p>[caption id="attachment_377" align="aligncenter" width="400" caption="Ceci n"]<a href="http://ejrh.files.wordpress.com/2011/04/not-a-julia.png"><img class="size-medium wp-image-377" title="not-a-julia" src="assets/not-a-julia.png?w=300" alt="" width="400" height="256" /></a>[/caption]<br />
+<!--more--></p>
+<p style="text-align:justify;">It <em>resembles</em> a slice of the <a title="Julia set at Wikipedia" href="http://en.wikipedia.org/wiki/Julia_set">Julia set</a>.  But the Julia set is contained within a boundary, while somewhere in this image there is a filament leading the rest of the Mandelbrot set outside the frame.  As I've not implemented coordinate tracking, I'm unlikely ever to find it again. :p</p>
+<p style="text-align:justify;">(<strong>Update</strong>: It's a <a title="Relationship with Julia sets at Wikipedia" href="http://en.wikipedia.org/wiki/Mandelbrot_set#Relationship_with_Julia_sets">Julia island</a>.  Maybe I should try reading the Wikipedia articles that I link to...)</p>
+<p style="text-align:justify;">The program is written in C, using SDL for graphics.  SDL is straightforward enough.  I know our <a title="Star Control II mod" href="http://ejrh.wordpress.com/2011/03/11/star-control-ii-mod/">SC2 mod</a> uses it, but that's always been abstracted away by UQM code.  (Learning SDL should save me from having to write Python and/or libpng renderers for my other simulations.)</p>
+<p style="text-align:justify;">It's not particularly efficient -- yet :).  I enabled <a title="OpenMP home page" href="http://openmp.org/wp/">OpenMP</a> for the loops, but it's not clear how much that helps.  It renders things in "blinds", i.e. lines 0, 20, 40, ... 1, 21, 41, ...; updating the displaying and checking user input between each set.  When OpenMP allocates the indexes (0, 20, ..., 1060) to each task, I believe it uses contiguous partitions.  This means that if, for instance, the top half the image is emptier than the bottom half, the threads handling that part will take longer to complete, while the others finish early.  For an efficient and even rendering, we want something like:</p>
+<ol style="text-align:justify;">
+<li>In this frame (i.e. between display updates), choose some fraction of the pixels to render.</li>
+<li>Partition that fraction into jobs, and allocate them to threads.</li>
+<li>Since some pixels take longer than others, distribute them evenly (or use a work list with more jobs than threads).</li>
+</ol>
+<p style="text-align:justify;">The technique that springs to mind is to treat the pixels as a linear array of size <em>N</em>.  To render in <em>n</em> frames, choose every <em>n</em>'th pixel for this frame <em>i</em>.  With <em>k</em> jobs, out of the chosen pixels, assign every <em>k</em>'th pixel to thread <em>j</em>.</p>
+<p>[sourcecode language="c"]int num_pixels = width*height;<br />
+int num_jobs = omp_get_num_threads();<br />
+int pixels_per_job = (int) ceil((double) num_pixels / num_frames / num_jobs);<br />
+if (frame &lt; num_frames)<br />
+{<br />
+    int j;<br />
+    #pragma omp parallel for<br />
+    for (j = 0; j &lt; num_jobs; j++)<br />
+    {<br />
+        int i;<br />
+        for (i = 0; i &lt; pixels_per_job; i++)<br />
+        {<br />
+            int a = (i * num_jobs + j) * num_frames + frame;<br />
+            if (a &lt; num_pixels)<br />
+            {<br />
+                int x = a % width;<br />
+                int y = a / width;<br />
+                do_pixel(x, y);<br />
+            }<br />
+        }<br />
+    }<br />
+    frame++;<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">Slightly messy since I'd like like to use OpenMP but I also want a bit more control about how it partitions the indexes of the loop.  Not tested yet...</p>
+<p style="text-align:justify;">(A small rant about MSVC -- it's a PITA getting even a simple C project to compile.  First there are complaints about undefined _main symbols; then there's the need to download a 350 MB SDK just to get a few kb of OpenMP libraries.  Would you believe people actually rave about how MSVC "just works"!)</p>

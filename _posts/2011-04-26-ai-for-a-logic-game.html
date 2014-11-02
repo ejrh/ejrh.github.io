@@ -1,0 +1,69 @@
+---
+layout: post
+title: AI for a logic game
+date: 2011-04-26 22:39:51.000000000 +12:00
+categories:
+- Games
+- Programming
+tags:
+- ai
+- knetwalk
+- logic
+- pygame
+- python
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:51:"http://ejrh.files.wordpress.com/2011/04/network.gif";s:6:"images";a:3:{s:51:"http://ejrh.files.wordpress.com/2011/04/network.gif";a:6:{s:8:"file_url";s:51:"http://ejrh.files.wordpress.com/2011/04/network.gif";s:5:"width";s:3:"450";s:6:"height";s:3:"450";s:4:"type";s:5:"image";s:4:"area";s:6:"202500";s:9:"file_path";s:0:"";}s:52:"http://ejrh.files.wordpress.com/2011/04/network4.gif";a:6:{s:8:"file_url";s:52:"http://ejrh.files.wordpress.com/2011/04/network4.gif";s:5:"width";s:3:"450";s:6:"height";s:3:"450";s:4:"type";s:5:"image";s:4:"area";s:6:"202500";s:9:"file_path";s:0:"";}s:52:"http://ejrh.files.wordpress.com/2011/04/network3.gif";a:6:{s:8:"file_url";s:52:"http://ejrh.files.wordpress.com/2011/04/network3.gif";s:5:"width";s:3:"202";s:6:"height";s:3:"202";s:4:"type";s:5:"image";s:4:"area";s:5:"40804";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"4";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-04-28
+    02:15:09";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">This is a clone of <a title="KNetwalk at KDE.org" href="http://games.kde.org/game.php?game=knetwalk">KNetwalk</a>.  I got addicted to this game when I got my Netbook.  Some of my daily train rides were spent adding a feature to my compiler, but equally often they culminated in a slightly improved KNetwalk high score.  When the hardest level (15x15, wraparound) because passé, did I stop there and recover from my obsession?  No, I wrote my own version, with harder maps!<br />
+<!--more--></p>
+<p style="text-align:justify;"><a title="Source code for network.py" href="http://pastebin.com/MGea6MpM">This version</a> is a little different from KDE's.  It doesn't penalise unnecessary moves or a slow solution time.  And the interface is still primitive: change the source code around line 480 to specify a different map.  It's enough for me to enjoy playing it, and it lets me experiment with AI strategies for solving it.  (N.B. I mean AI in the very weak sense of a set of rules for solving a particular problem.)</p>
+<p style="text-align:justify;">The map is an array of cells.  It can optionally be a torus, i.e. the sides wrap round.  One (or optionally several) sources are placed on the map.  A tree of edges is grown from this, the leaves of which become sinks.  Cells into which an edge does not grow become voids.</p>
+<p style="text-align:justify;">My version does not generate the same kinds of maps as the original: it leaves more voids.  I've not seen the original generation algorithm so I can only guess the reason for this.  My algorithm seems pretty obvious, so who knows what they're doing. :p</p>
+<p style="text-align:justify;">The cells are defined with two sets of edge states:</p>
+<ul style="text-align:justify;">
+<li><strong>true_ports</strong> - initialised when the map is generated, not changed.  (Not used except when the map is finished by the player.)</li>
+<li><strong>ports</strong> - a rotation of true_ports; rotated randomly when the map is scrambled, rotated when a cell is clicked on.</li>
+</ul>
+<p style="text-align:justify;">Heat is propagated from the sources.  When two adjacent cells are connected (by each having a port to the other), heat flows between them.  Unconnected cells lose their residual heat.  The aim is for all sinks to be warm, i.e. in a steady state of receiving some heat.</p>
+<p>[caption id="attachment_462" align="aligncenter" width="450" caption="A human playing network.py"]<a href="http://ejrh.files.wordpress.com/2011/04/network.gif"><img class="size-full wp-image-462" title="network" src="assets/network.gif" alt="" width="450" height="450" /></a>[/caption]</p>
+<h2>Simple AI player</h2>
+<p style="text-align:justify;">Each cell records two additional sets of edge states:</p>
+<ul style="text-align:justify;">
+<li><strong>necessary</strong> - the edge here is necessarily part of the solution.  Initially, no edges are necessary.</li>
+<li><strong>possible</strong> - the edge here is possible.  Initially, all edges are possible.</li>
+</ul>
+<p style="text-align:justify;">The player uses heuristics for each cell type to populate these when appropriate.  Here are some example rules:</p>
+<ul style="text-align:justify;">
+<li>If a cell with a corner tile has a necessary edge, then the opposite edge is not possible.</li>
+<li>If a cell with a straight tile has a necessary edge, then the opposite is also necessary.</li>
+<li>If a cell is adjacent to a void, then their shared edge is not possible.</li>
+<li>If two cells are sinks, then their shared edge is not possible (because if that edge was in use, they would connect only to each other and be isolated from the source).</li>
+<li>If an edge for one cell is necessary, then the same edge for the neighbouring cell is also necessary.</li>
+<li>If an edge for one cell is not possible, then the same edge is the neighbouring cell is not possible.</li>
+<li>If num(ports) = num(necessary) or num(ports) = num(possible), then the cell is solved.</li>
+</ul>
+<p style="text-align:justify;">The AI player does a pretty good job, but usually cannot solve the whole map.  One problem is that progress is made only at the local level, using local information.  The partial solution is propagated, but only through necessary and possible.  Information about distant cells is unavailable unless it can be expressed in terms of these variables.  (The logic game Minesweeper has similar strategies.  In that case, the information propagated is usually the number printed on each revealed cell.  See http://web.mat.bham.ac.uk/R.W.Kaye/minesw/ for more info on Minesweeper logic, including papers regarding its Turing- and NP-completeness)</p>
+<p>[caption id="attachment_465" align="aligncenter" width="450" caption="An AI player ruthlessly sweeping over the map, but then failing at a cycle of mutually-insoluble cells."]<a href="http://ejrh.files.wordpress.com/2011/04/network4.gif"><img class="size-full wp-image-465" title="network4" src="assets/network4.gif" alt="" width="450" height="450" /></a>[/caption]</p>
+<p style="text-align:justify;">An additional heuristic slightly extends the neighbourhood of visible cells to eliminate simple cycles, which are not strictly necessary for lighting all sinks, and which cannot be part of the generated solution since the generation algorithm uses a tree.  It identifies sets of three mutually incident edges that are each necessary, and hence marks the fourth edge as not possible.</p>
+<p>[caption id="attachment_463" align="aligncenter" width="202" caption="AI player eliminating simple cycles; pink bars indicate necessary edges, pink cross indicates not possible"]<a href="http://ejrh.files.wordpress.com/2011/04/network2.gif"><img class="size-full wp-image-463" title="network2" src="assets/network2.gif" alt="" width="202" height="202" /></a>[/caption]</p>
+<p style="text-align:justify;">The next attempt was to exploit the tree structure of the map, in particular the fact that there is exactly one path from a sink to it source.  Live and dead flags are maintained for each cell, indicating that the cell is known to be live (i.e. has a solved path to the source), and dead (i.e. only one edge leads to the source; all others are dead ends).  Ultimately, each cell should be marked both live and dead.  A heuristic that uses this information is:</p>
+<ul style="text-align:justify;">
+<li>If all but one neighbouring cells are dead, then the remaining one is necessary.</li>
+<li>If this cell is live and a neighbouring cell is also live, and the edge between them is not necessary, then that edge is not possible.  (As each cell is live, each already has a solved path to the source; they are on different branches of the tree.)</li>
+</ul>
+<p style="text-align:justify;">However, as currently implemented these heuristics lead to unsound behaviour by the AI player, so I've disabled them.  The problem is likely a faulty concept of "deadness".</p>
+<p style="text-align:justify;">Another trickier problem is that the AI solves things by eliminating alternatives until there is only one choice.  But sometimes maps are generated with more than one possible solution!  People I've discussed this with have been astonished that the AI doesn't simply pick a solution and be done with it.  It's as if the computer is suffering from the "tyranny of choice" -- though in this case it's not so much fear of picking the wrong choice that holds the machine up, as simply being unable to identify a viable solution because the presence of alternatives casts doubt on it.</p>
+<p>[caption id="attachment_464" align="aligncenter" width="202" caption="A tricky problem: which of two solutions do we pick?"]<a href="http://ejrh.files.wordpress.com/2011/04/network3.gif"><img class="size-full wp-image-464" title="network3" src="assets/network3.gif" alt="" width="202" height="202" /></a>[/caption]</p>
+<h2>Backtracking AI?</h2>
+<p style="text-align:justify;">The simple AI is fairly efficient: it makes progress based on local (i.e. finite) information only, and does not backtrack.  However as explained it is not complete.  A full depth-first solver could fill in the holes left by the simple AI.  Additionally, it would stop at the first solution found, thus taking an <a title="Gordian knot at Wikipedia" href="http://en.wikipedia.org/wiki/Gordian_Knot">Alexandrian swipe</a> at the multiple-solution issue.</p>
+<p style="text-align:justify;">Could it treat each remaining hole as a self-contained problem, deducing its solution from its cells and the known edges on its periphery?  I don't think so -- at least, not without correct liveness/deadness information.  Because some parts of the periphery may be disconnected from the source, and need a connection running through the hole.  It is difficult to recognise this without liveness/deadness, or non-local examination of the paths through the whole maze.</p>
+<p style="text-align:justify;">A more appropriate language for a backtracking AI might be <a title="Prolog at Wikipedia" href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>.  But it should be feasible in Python; the main issue with nondeterministic programs in Python is managing huge sets of possible values.  Luckily, Python's generators provide a natural technique for doing this more efficiently.</p>

@@ -1,0 +1,49 @@
+---
+layout: post
+title: Recreating the puzzle animation
+date: 2012-02-12 20:38:04.000000000 +13:00
+categories:
+- Programming
+tags:
+- graphics
+- pov-ray
+- puzzle
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  tagazine-media: a:7:{s:7:"primary";s:51:"http://ejrh.files.wordpress.com/2012/02/compare.png";s:6:"images";a:5:{s:49:"http://ejrh.files.wordpress.com/2012/02/cubes.png";a:6:{s:8:"file_url";s:49:"http://ejrh.files.wordpress.com/2012/02/cubes.png";s:5:"width";s:3:"966";s:6:"height";s:3:"322";s:4:"type";s:5:"image";s:4:"area";s:6:"311052";s:9:"file_path";s:0:"";}s:52:"http://ejrh.files.wordpress.com/2012/02/cylinder.png";a:6:{s:8:"file_url";s:52:"http://ejrh.files.wordpress.com/2012/02/cylinder.png";s:5:"width";s:3:"966";s:6:"height";s:3:"322";s:4:"type";s:5:"image";s:4:"area";s:6:"311052";s:9:"file_path";s:0:"";}s:48:"http://ejrh.files.wordpress.com/2012/02/hole.png";a:6:{s:8:"file_url";s:48:"http://ejrh.files.wordpress.com/2012/02/hole.png";s:5:"width";s:3:"966";s:6:"height";s:3:"322";s:4:"type";s:5:"image";s:4:"area";s:6:"311052";s:9:"file_path";s:0:"";}s:57:"http://ejrh.files.wordpress.com/2012/02/puzzle-centre.png";a:6:{s:8:"file_url";s:57:"http://ejrh.files.wordpress.com/2012/02/puzzle-centre.png";s:5:"width";s:3:"480";s:6:"height";s:3:"480";s:4:"type";s:5:"image";s:4:"area";s:6:"230400";s:9:"file_path";s:0:"";}s:51:"http://ejrh.files.wordpress.com/2012/02/compare.png";a:6:{s:8:"file_url";s:51:"http://ejrh.files.wordpress.com/2012/02/compare.png";s:5:"width";s:3:"960";s:6:"height";s:3:"480";s:4:"type";s:5:"image";s:4:"area";s:6:"460800";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"5";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-02-12
+    07:38:04";}
+  _wpas_done_linkedin: '1'
+author: 
+---
+<p style="text-align:justify;">One of the things from my old home page was this puzzle animation:</p>
+<p>[youtube=http://www.youtube.com/watch?v=-oiwvJ3_QR4]</p>
+<p><!--more--></p>
+<p style="text-align:justify;">The story is that my brother gave me a seven-piece wooden puzzle for Christmas, which took me almost the rest of the year to solve. Having done so, I thought I'd better make a note of the solution, in case an ambitious guest pulls it apart and gets stuck. The solution was written and animated in <a title="POV-Ray home page" href="http://povray.org/">POV-Ray</a>.</p>
+<p style="text-align:justify;">POV-Ray is an excellent, free, <a title="Raytracing at Wikipedia" href="http://en.wikipedia.org/wiki/Ray_tracing_%28graphics%29">raytracer</a>. It's arguably a bit old school: you describe your scene using a simple programming language, and POV-Ray renders (i.e. "compiles") it to an image.</p>
+<p style="text-align:justify;">I had a number of projects with it, most of them ridiculously over-ambitious (like, raytrace a whole city). This is one of the few which actually reached some form of completion. ;-)</p>
+<p style="text-align:justify;">As it was a relatively successful project, I'm taking the opportunity to do it again, pretty much exactly as it was the first time.</p>
+<h2>Defining basic shapes</h2>
+<p style="text-align:justify;">The puzzle is made of pieces, each of which is a collection of blocks, pegs, and holes. First we need to define these.</p>
+<p style="text-align:justify;">POV-Ray provides a handful of geometric solids: boxes, spheres, cylinders, etc. But most objects in the real world are more complicated than these. Most 3D rendering tools construct objects out of large numbers of triangles. In POV-Ray, you do it by combining these primitives using <a title="Constructive solid geometry at Wikipedia" href="http://en.wikipedia.org/wiki/Constructive_solid_geometry">constructive solid geometry</a>.</p>
+<p style="text-align:justify;">For instance, a wooden cube does not have perfectly sharp, 90-degree edges and corners. The corners and edges get smoothed off by design or wear. When I render anything boxlike, I think it looks more authentic if objects do have smoothed off edges.</p>
+<p style="text-align:justify;">To make a smoothed box, we can use cylinders for the edges, and spheres for the corners. First we use three overlapping boxes for the flat sides, but leave room for the corners and edges:</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/02/cubes.png"><img class="aligncenter size-full wp-image-1760" title="cubes" src="assets/cubes.png" alt="" width="640" height="213" /></a></p>
+<p style="text-align:justify;">A similar construction is made for cylinders. In their case, the sharp edges are the circular rims around the ends. They can be smoothed by taking two concentric cylinders, and capping them with toruses.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/02/cylinder.png"><img class="aligncenter size-full wp-image-1759" title="cylinder" src="assets/cylinder.png" alt="" width="640" height="213" /></a></p>
+<p style="text-align:justify;">The last construction required for the puzzle is the holes that pegs fit into. Ordinarily these are made by subtracting a cylinder from the block. But this leaves a sharp inner rim around the hole. Smoothing this off requires subtracting another cylinder at the end of the hole. Finally the rim is smoothed over with a torus, whose inner side provides the curved surface.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/02/hole.png"><img class="aligncenter size-full wp-image-1758" title="hole" src="assets/hole.png" alt="" width="640" height="213" /></a></p>
+<p style="text-align:justify;">A hole's cylinders are subtracted from a block. But the final torus must be added back to the block after that subtraction. The resulting object is <code>Block - HoleCylinders + HoleTorus</code>. Since we want holes to be reusable, it is slightly easier to rewrite that as <code>Block - (HoleCylinders - HoleTorus)</code>, i.e. treat the hole as an integrated object that can be subtracted all at once. This kind of geometrical algebra is generally sound in CSG, though should be read as set theory rather than arithmetic: addition is union, and subtraction is intersection with the complement.</p>
+<p style="text-align:justify;">We can then write a macro to construct a piece from a set of blocks, holes and pegs, and define all seven pieces using that macro.</p>
+<h2>Reconstructing the scene</h2>
+<p style="text-align:justify;">The original scene began with the pieces laid out around the centre. Although I only have the video, with a few assumptions it should be possible to reconstruct the arrangement. The first assumption is that large, round units (such as the size of a single cube) were used to position objects in the scene, including the camera.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/02/puzzle-centre.png"><img class="aligncenter size-full wp-image-1762" title="puzzle-centre" src="assets/puzzle-centre.png" alt="" width="480" height="480" /></a></p>
+<p style="text-align:justify;">Take this image from the video. The centre of the video corresponds to the nearest corner, point A. We can therefore aim the camera at that point. Additionally, point B is 2 units on the z-axis and 3 units on the x-axis remove point A. Since point B is aligned with centre, the camera x and z coordinates must be a ratio of 2/3 from point A too. The final thing to observe is that the trapeziums on the top and right-hand faces are approximately similar. This may imply that the camera position's z and y coordinates are the same, too.</p>
+<p style="text-align:justify;">The second assumption from the original video is that the movement of the pieces is at regular speed in terms of units. Playing the video frame by frame, it takes piece #2 20 frames to move down onto piece #5; the last 4 frames correspond to moving 1 unit, so we can infer a speed of 0.25 units per frame, and an initial position 5 units up. Similar speed and distance apply to most of the other pieces.</p>
+<p style="text-align:justify;">Piece #3 moves more slowly, and takes 40 frames to move leftward to just above its final position. Watching how long it takes for it to move 1 unit, it appears to move at 0.1 units per frame, putting it 4 units out from its position on the z-axis. Piece #7 (the final peg) also moves at the slower rate and is 4 units along that axis.</p>
+<p style="text-align:justify;">Trail and error gets us the rest of the way, if we also assume the camera coordinates are going to be in whole units. We can compare the new scene with the first frame of the video to verify that they are aligned up correctly.</p>
+<p><a href="http://ejrh.files.wordpress.com/2012/02/compare.png"><img class="aligncenter size-full wp-image-1763" title="compare" src="assets/compare.png" alt="" width="640" height="320" /></a></p>
+<p style="text-align:justify;">The new scene has slightly different textures and lighting, and no sky, but the positions are identical. (Side-by-side was the best static comparison to show; a blending animation turns out to be too distracting.)</p>
+<p style="text-align:justify;">The scene so far, with static positioning of the pieces, is <a title="Puzzle animation source in Edmund's Projects" href="http://code.google.com/p/ejrh/source/browse/trunk/games/puzzle.pov">in my public repository</a>. In the next instalment, we'll try animating the scene using the POV-Ray clock variable!</p>

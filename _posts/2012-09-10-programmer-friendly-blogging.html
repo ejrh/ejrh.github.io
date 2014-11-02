@@ -1,0 +1,45 @@
+---
+layout: post
+title: Programmer-friendly blogging
+date: 2012-09-10 18:34:18.000000000 +12:00
+categories:
+- Programming
+- Rants
+tags:
+- blogging
+- text
+- wordpress
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+  tagazine-media: a:7:{s:7:"primary";s:0:"";s:6:"images";a:0:{}s:6:"videos";a:0:{}s:11:"image_count";i:0;s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2012-09-13
+    05:38:42";}
+  _wp_old_slug: programmer-friendly-comments
+author: 
+---
+<p style="text-align:justify;">Commenting on a blog post about an <a title="Phantom types in Java at Gabriel's software development blog" href="http://gabrielsw.blogspot.co.nz/2012/09/phantom-types-in-java.html">interesting use of generics</a> in Java, I've had the pleasure of seeing my carefully typed code translated from:</p>
+<p>[sourcecode language="java"]public Connection&lt;Closed&gt; close(Connection&lt;Open&gt; c) ....</p>
+<p>Connection&lt;Closed&gt; c2 = close(c);[/sourcecode]</p>
+<p style="text-align:justify;">to:</p>
+<p>[sourcecode language="java"]public Connection close(Connection c) ....</p>
+<p>Connection c2 = close(c);[/sourcecode]</p>
+<p style="text-align:justify;">Gosh, I never realised <a title="Problems with type erasure in Java's Generics, at Wikipedia" href="http://en.wikipedia.org/wiki/Generics_in_Java#Problems_with_type_erasure">type erasure</a> could be performed at the HTML level. Unfortunately this almost completely impaired my comment, in full view of the public. (It can be reconstructed with a bit of common sense, but you have to have the generosity to assume the writer would not intentionally write such spurious junk, which may be too much to ask of the online community :p.)</p>
+<p style="text-align:justify;">Writing about programming using standard blogging software is not generally as painful as it once was. WordPress, for instance, provides a <a title="Posting source code in WordPress" href="http://en.support.wordpress.com/code/posting-source-code/">sourcecode</a> shortcode, which enables code for many languages to be safely pasted into a post and reliably formatted (but unfortunately not XML-based code, which is subject to being reescaped every time it is viewed in the editor, culminating in a bloated mess like <code>&amp;amp;lt;data x=&amp;amp;quot;42&amp;amp;quot;/&amp;amp;lt;</code>). So there are many blogs with nicely presented source code samples.</p>
+<p style="text-align:justify;">Commenting remains programmer-unfriendly. Comment boxes often support plain text, with a limited set of HTML elements (for bold, italics, linking). And as witnessed in today's example, those elements that aren't supported can be stripped out rather than treated as intentional text input. And the other problem with comments is they can't be edited, so the author does not know how their unsupported text wil be rendered until it is too late to use a workaround.</p>
+<p style="text-align:justify;">This addition to my experience as a blog writer and commenter makes me feel that HTML is no longer the state of the art for simple, human- (and programmer-) friendly text markup. Humans want something that:</p>
+<ol style="text-align:justify;">
+<li>Supports common typesetting features like bold, italics, lists, and links.</li>
+<li>Is easy to type, with few unusual symbols and no need to worry about proper nesting in simple cases.</li>
+<li>Is readable when being written as markup (an approximation of its rendered form).</li>
+</ol>
+<p style="text-align:justify;">And programmers desire these features too, as well as:</p>
+<ol style="text-align:justify;" start="4">
+<li>Allows source code to be pasted in and rendered attractively, without requiring the code's various symbols to be escaped lest they trigger some other behaviour on the input system.</li>
+</ol>
+<p style="text-align:justify;"><a title="Markdown at Wikipedia" href="http://en.wikipedia.org/wiki/Markdown">Markdown</a> seems to be the way to go. Github supports it, and Gists are increasingly being used as blog posts (though the Github interface is awful). StackOverflow supports it for answers, where it provides a live preview of the rendered result.</p>
+<p style="text-align:justify;">As mentioned <a title="Preliminary reflections on blogging" href="http://ejrh.wordpress.com/2011/02/13/preliminary-reflections-on-blogging/">when I first started</a> blogging here, I think it would be great if Wordpress supported Markdown -- for posts <em>and</em> comments. It would be great if other platforms, such as the Blogspot site where I attempted to post my comment, followed suit, so that it became the de facto standard for text input on the internet. I do think even normal humans would find themselves using it as a straightforward, efficient, and reliable middle ground between the misfocus of WYSIWYG and the unfriendliness of HTML.</p>
+<p><strong>PS.</strong> Hmm, my code examples got type-erased when I wrote this post, too...</p>

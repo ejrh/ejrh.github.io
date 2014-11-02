@@ -1,0 +1,69 @@
+---
+layout: post
+title: Call graphs in Python
+date: 2011-12-23 12:04:34.000000000 +13:00
+categories:
+- Programming
+tags:
+- graphviz
+- python
+- static analysis
+- work
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  tagazine-media: a:7:{s:7:"primary";s:45:"http://ejrh.files.wordpress.com/2011/12/t.png";s:6:"images";a:3:{s:45:"http://ejrh.files.wordpress.com/2011/12/x.png";a:6:{s:8:"file_url";s:45:"http://ejrh.files.wordpress.com/2011/12/x.png";s:5:"width";s:3:"323";s:6:"height";s:2:"89";s:4:"type";s:5:"image";s:4:"area";s:5:"28747";s:9:"file_path";s:0:"";}s:48:"http://ejrh.files.wordpress.com/2011/12/pyan.png";a:6:{s:8:"file_url";s:48:"http://ejrh.files.wordpress.com/2011/12/pyan.png";s:5:"width";s:4:"1001";s:6:"height";s:3:"443";s:4:"type";s:5:"image";s:4:"area";s:6:"443443";s:9:"file_path";s:0:"";}s:45:"http://ejrh.files.wordpress.com/2011/12/t.png";a:6:{s:8:"file_url";s:45:"http://ejrh.files.wordpress.com/2011/12/t.png";s:5:"width";s:4:"1745";s:6:"height";s:3:"375";s:4:"type";s:5:"image";s:4:"area";s:6:"654375";s:9:"file_path";s:0:"";}}s:6:"videos";a:0:{}s:11:"image_count";s:1:"3";s:6:"author";s:8:"14086420";s:7:"blog_id";s:8:"19263352";s:9:"mod_stamp";s:19:"2011-12-23
+    23:07:39";}
+  _wpas_skip_yup: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">As a guide to program structure, and hopefully an aid to refactoring.<br />
+<!--more--></p>
+<p style="text-align:justify;">It's depressing to look at previous creations and realise how defective they are. This situation is something that programmers -- perhaps more than any other group -- routinely find themselves embarrassed by. The things we make are complicated and there are many ways to make them. Often they make sense only to the people who wrote them; and a few months on, the writer is a different person and no longer able to read their own work!</p>
+<p style="text-align:justify;">In my case, I've returned to work on a work project dating from 2008. It's a Python program that loads fixed-width text files, extracts a few columns, and generates XML containing that data. But it also does lots of other things:</p>
+<ul>
+<li style="text-align:justify;">Gathering and merging config from the command line, a file, and a remote DB</li>
+<li style="text-align:justify;">Downloading input from FTP servers</li>
+<li style="text-align:justify;">Mapping some data using remote DB tables</li>
+<li style="text-align:justify;">Putting output on queues</li>
+<li style="text-align:justify;">Automatically retrying certain steps according to the config</li>
+<li style="text-align:justify;">Sending status emails</li>
+</ul>
+<p style="text-align:justify;">The new work is to support a new type of input; the only real changes are in the input parser. But I can hardly test it without setting up two remote databases, and FTP server, and an MQ queue. The problem is the program has a large "Processor" class that is responsible for doing all the high level work; some lower-level parts have been put in modules, but all the work of comprehending the config and locating all these external dependencies, then acquiring the input, iterating over it, mapping each data item, collecting the results, then sending them out is implemented in this monstrous <a title="God class on C2" href="http://c2.com/cgi/wiki?GodClass">God class</a>.</p>
+<p style="text-align:justify;">The thing needs drastic <a title="Refactoring at Wikipedia" href="http://en.wikipedia.org/wiki/Code_refactoring">refactoring</a>.</p>
+<p style="text-align:justify;">The immediate problem is that there's no dependency injection. The code that coordinates processing the input goes and finds its own DBs, queues and servers. Instead, there should be a simple default main function that finds these dependencies, and passes them into the processor. That way, my test can have a similar function that uses different data sources (say, a test input file, and a test output directory, and a test mapping table rather than the FTP server, MQ queues, and DBs).</p>
+<p style="text-align:justify;">But I haven't worked on it for 3 years. I need to understand the program before I can figure out how to modularise that processer class. As a dynamic language, Python does not support much automatic refactoring. I need to manually track down every object before I can move it somewhere else.</p>
+<p style="text-align:justify;">Searching for "refactoring python", I found that others have had the same idea about <a title="Generating call graphs for understanding and refactoring python code" href="http://blog.prashanthellina.com/2007/11/14/generating-call-graphs-for-understanding-and-refactoring-python-code/">refactoring using the call graph</a> is a guide. They've written a simple program to analyse a Python program for the function called in it.</p>
+<p style="text-align:justify;">It's pretty cool. Unfortunately it doesn't handle classes.</p>
+<p style="text-align:justify;">I've written a similar program. It analyses a set of Python source files, finding all the "callables" (modules, classes, and functions), and all references to them. All objects with the same name are treated as the same item -- because it's very hard to detect when they aren't. These are compiled into a directed graph containing edges for "defines" and "uses". An object X <em>defines</em> Y if a definition of Y appears inside X, for example, classes and functions in a module, and methods within a class. An object X <em>uses</em> Y if the code for X includes a reference to Y, and Y is a callable. This could be literal function call, or it could be a simple reference to the callable, for instance passing it as a callback.</p>
+<p style="text-align:justify;">For instance, take this Python code.</p>
+<p>[sourcecode language="python"]# In a file called X.py</p>
+<p>def Z(n):<br />
+    return W(n)+1</p>
+<p>class X:<br />
+    def Y(n):<br />
+        return Z(n)[/sourcecode]</p>
+<p style="text-align:justify;">The resulting diagram is:</p>
+<p style="text-align:justify;"><a href="http://ejrh.files.wordpress.com/2011/12/x.png"><img class="aligncenter size-full wp-image-1528" title="x" src="assets/x.png" alt="" width="323" height="89" /></a></p>
+<p style="text-align:justify;">The module X and the class X have been combined into the same node (since in any reference to X, it would be hard to tell which was being used).  X defines three callables: itself, the method Y, and the function Z (self-definition and self-use are loops in the graph and can be omitted with a small code change).  The method Y calls Z.  Z also calls W, but there's no definition of W anywhere, so it doesn't appear on the graph.</p>
+<p style="text-align:justify;">Let's try running it on it's own source:</p>
+<p>[caption id="attachment_1520" align="aligncenter" width="640" caption="Call graph of a call graph generating program"]<a href="http://ejrh.files.wordpress.com/2011/12/pyan.png"><img class="size-full wp-image-1520" title="pyan" src="assets/pyan.png" alt="" width="640" height="283" /></a>[/caption]</p>
+<p style="text-align:justify;">Ok, so the universe didn't collapse (which is always a danger when you fool around with self-referential systems :p). It's not a very complicated program, so the result is quite readable.  That's largely because it uses an external module to do most of the work.</p>
+<p style="text-align:justify;">The program uses Python's <a title="Docs for compiler module" href="http://docs.python.org/library/compiler.html">compiler</a> module to parse the input, and to walk over the abstract syntax trees produced by the parser. This contrasts with Prashanth Ellina's approach, which uses a concrete syntax tree produced by the <a title="Docs for parser module" href="http://docs.python.org/library/parser.html">parser</a> module. The compiler code is higher-level and, in my opinion, more appropriate; but on the other hand, the module is deprecated! (Which is a pain, because it's pretty useful. I'm not 100% sure what's replacing it.)</p>
+<p style="text-align:justify;">And here's the output for my problematic work program:</p>
+<p>[caption id="attachment_1521" align="aligncenter" width="640" caption="Call graph for a larger, badly designed program"]<a href="http://ejrh.files.wordpress.com/2011/12/t.png"><img class="size-full wp-image-1521" title="t" src="assets/t.png" alt="" width="640" height="137" /></a>[/caption]</p>
+<p style="text-align:justify;">Not so friendly a diagram. The aspect ratio is a problem, since it makes it harder to print the diagram into a single A3 sheet. (<a title="GraphViz home page" href="http://graphviz.org/">GraphViz</a> includes an option for forcing an aspect ratio, but strangely it corrupts this image by adding sets of spurious multiedges between nodes that already have more than one relationship.)</p>
+<p style="text-align:justify;">Objects that use each other form natural clusters.  It's possible that these correspond to sensible modules in the program.  This diagram shows a couple of clusters: the sink-related objects in the bottom-right, and some parsing-related objects in the bottom-left.  But mostly the program is a mess of tentacles spreading out from the processor.</p>
+<p style="text-align:justify;">I have a couple of ideas that could make these relationships more obvious.  The first is to colour-code the nodes according to which module they belong to.  The presence of the same coloured nodes all over the graph would be a sign that a module is relatively intrusive in other modules.  The other idea is to weight the edges by number of uses: this could help graphviz to pull strongly related objects closer together, making this clusters more obvious.</p>
+<p style="text-align:justify;">Still, I'm not precisely sure what the equivalent of a nice program would look like.  But I'm guessing it would be much less messy.  I guess the next steps are:</p>
+<ol>
+<li style="text-align:justify;">Refactor the program (using conventional wisdom; there is plenty of this on the <a title="Anti Patterns on C2" href="http://c2.com/cgi/wiki?AntiPatternsCatalog">C2 wiki</a>).</li>
+<li style="text-align:justify;">Generate its new call graph.</li>
+<li style="text-align:justify;">Compare against this one.</li>
+</ol>
+<p style="text-align:justify;">The results of that experiment could give us some insight into what a good program looks like.</p>
+<p style="text-align:justify;">

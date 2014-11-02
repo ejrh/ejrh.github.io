@@ -1,0 +1,34 @@
+---
+layout: post
+title: Version control thoughts
+date: 2011-02-08 21:45:14.000000000 +13:00
+categories:
+- Programming
+tags:
+- fire
+- svn
+- version control
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_skip_yup: '1'
+  _wpas_skip_linkedin: '1'
+  _wpas_skip_ms: '1'
+author: 
+---
+<p style="text-align:justify;">Last year I lost all my programming work in a fire.  This consisted, primarily, of my <a title="Subversion home page (now as an Apache project!)" href="http://subversion.apache.org/">Subversion</a> repository.<br />
+<!--more--></p>
+<p style="text-align:justify;">It also included all the backups of the repository, which were on optical media in the same room.  Since then I've been imploring people to <strong>make backups now,</strong> and <strong>put them offsite</strong>.  I've even gone so far as to suggest mutual exchanges of offsite backups.  However, I've not yet accumulated much worth backing up that isn't already online.</p>
+<p style="text-align:justify;">After a couple of months of doing little more than <a title="Pure-paper packable polyhedra in Python" href="http://ejrh.wordpress.com/2011/01/25/pure-paper-packable-polyhedra-in-python/">drawing some lines in Python</a>, I have decided it's time to start rebuilding.</p>
+<p style="text-align:justify;">For the past 7 or 8 years I've been using Subversion to store most of my work (source code, documents, config files).  This has worked well and at various times I've contributed back to svn and/or tried to encourage its use among people I know.  There are even a couple of patches from me in the Subversion source history (whether that code is still used after all these years is unknown).  My personal svn repository had reached just over 3000 checkins at last count, which represented one of the most consistent and well-organised records I've managed to keep in my life.  I had an <a title="svnindex page on Edmund's old home page" href="http://homepages.paradise.net.nz/~ejrh/subversion/svnindex/">svnindex</a> tool that would record the individual words changed in an SQL database, enabling ad-hoc querying.</p>
+<p style="text-align:justify;">But now, for obvious reasons, I have a unique opportunity to rethink some of my practices, policies, habits and approaches.  Including my choice of version control system.</p>
+<p style="text-align:justify;">I've had some potential epiphanies about this.  They are quite ambitious and before committing to them I'd like to think a bit more about what I really need.  Some points I have been considering:</p>
+<ul style="text-align:justify;">
+<li>Will it work with a large variety of data (images, documents, source code, etc.) ?</li>
+<li>How will it cope with development shared between my main machine and my netbook?  These run different operating systems with different file system layouts, and not all projects are common to both.</li>
+<li>What about actual shared projects involving separated users and machines?  This includes on machines with separate availability -- each will need to function in the absence of the others.</li>
+<li>Does it have good portability, UIs and extensibility?  E.g. can I query its repository for whatever purpose without needing to waste time hacking the code or deciphering the data format?</li>
+</ul>
+<p style="text-align:justify;">I'll ponder this a bit more.  If anyone else has strong opinions on version control -- and what it is supposed to do -- that could apply to the above I'm happy to hear them.  I'm not yet choosing a specific version control system to go with; that will be addressed in a forthcoming post.</p>

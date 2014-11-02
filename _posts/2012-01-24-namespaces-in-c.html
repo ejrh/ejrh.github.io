@@ -1,0 +1,161 @@
+---
+layout: post
+title: Namespaces in C
+date: 2012-01-24 20:20:59.000000000 +13:00
+categories:
+- Higher-level C
+tags:
+- c
+- namespace
+- struct
+status: publish
+type: post
+published: true
+meta:
+  _edit_last: '14086420'
+  _wpas_done_linkedin: '1'
+  _wpas_skip_yahoo: '1'
+author: 
+---
+<p style="text-align:justify;">This post describes why <a title="Namespaces at Wikipedia" href="http://en.wikipedia.org/wiki/Namespace">namespaces</a> are useful in programming. It also discusses some of the obvious ways of simulating them in C, including a technique for "reifying" them, using structs.<br />
+<!--more--></p>
+<p style="text-align:justify;">A <em>namespace</em> is a set of names of objects in a system; it provides a way to disambiguate its objects from those with similar names in other namespaces. Namespaces are useful in larger programs, especially as a way to avoid clashes between symbols from independently-developed modules and libraries.</p>
+<p style="text-align:justify;">They also have the benefit of organising code semantically. When the namespace of a function, for instance, is visible in the code, it is obvious where a reader of the code should look for more information. That can apply both to external documentation, and to the implementation of the function in other source files.</p>
+<p style="text-align:justify;">Unfortunately, C has little namespacing functionality at the language level. In the case of identifiers (functions and variables), there is one namespace, subject to scoping rules. And any identifier that must be shared between two compilation units is necessarily shared between them all: when you "extern" an identifier, you are using the link-level namespace.</p>
+<h2>Naming conventions for namespaces</h2>
+<p style="text-align:justify;">The common workaround to C's lack of namespaces is to use a standard name prefix for each module. The prefix indicates the app, library or module the name belongs to.</p>
+<p style="text-align:justify;">For example, in Subversion you have names like svn_fs_initialize -- this indicates that the function belongs to the svn_fs library. Subversion describes <a title="Subversion code modularity and interface visiblity conventions" href="http://subversion.apache.org/docs/community-guide/conventions.html#interface-visibility">several layers</a> of namespacing conventions. <code>svn_fs_initialize</code> is an example of a name in the public API. Names that need to visible to other modules within a single Subversion library use a double underscore to separate the namespace, for example, <code>svn_fs_base__dag_get_node</code>. Finally, non-exported functions used within a single module do not use a prefix.</p>
+<p style="text-align:justify;">Note that use of double underscores within names is discouraged for application programming; it is reserved for the "implementation" (often read as compiler and standard library). Subversion is a set of libraries, however, and its use of double underscores is well-defined and always alongside the prefix "svn", so it is arguably safe in their case.  In my code I have often used it to separate a class name from the names of methods, e.g. <code>galaxy__add_star</code>, as in my earlier post on <a title="Encapsulation in C" href="http://ejrh.wordpress.com/2011/04/29/encapsulation-in-c/">encapsulation</a>, and in the examples below.  Cleaner code would avoid using double underscores like this, though.</p>
+<p style="text-align:justify;">There is a tradeoff between prefix uniqueness and verbosity.  A very short namespace prefix runs the risk of conflicting with other libraries.  A long one expands the size of the code and encumbers features like autocompletion -- you need to type the whole namespace before the list of possible matches begins to narrow from the full set of symbols in your library.</p>
+<h2>Reified namespaces with structs</h2>
+<p style="text-align:justify;">Can we separate the namespace from the name by something more tangible than a few characters? Instead of writing "namespace_object", and relying on a human parser to recall that "_" separates the two parts, could we write the parts as separate names with a language symbol between them? After all, that is what other languages like C++ ("::") and Python (".") do.</p>
+<p style="text-align:justify;">C++ is a static language in which the location and scope of every name is determined during compilation; "Namespace::Object" indicates that the object is defined in that namespace.</p>
+<p style="text-align:justify;">Python, on the other hand, is a dynamic language and does not have explicit namespaces (it does have scopes, however). When objects are created, the can be assigned to properties of some other object; the parent effectively becomes a namespace. This is what Python modules are: they are objects with properties, such as the module "os", with its property "os.getcwd".</p>
+<p style="text-align:justify;">C does not have an operator "::". But it does have ".": this is used to access a field in a struct. If we define a suitable struct, and make an instance of it with appropriate initial values, we can use it as a namespace. The namespace becomes <em>reified</em> (made real) in the sense that it is no longer a convention on the first few letters in each name, but is now a separate symbol in the program.</p>
+<p>[sourcecode language="cpp"]/* galaxy.h */<br />
+#ifndef GALAXY_H<br />
+#define GALAXY_H</p>
+<p>typedef struct STAR { ... } STAR;</p>
+<p>typedef struct GALAXY { ... } GALAXY;</p>
+<p>extern GALAXY *galaxy__create(void);<br />
+extern void galaxy__create(GALAXY *galaxy);<br />
+extern void galaxy__add_star(GALAXY *galaxy, STAR *star);</p>
+<p>static const struct<br />
+{<br />
+    GALAXY *(* create)(void);<br />
+    void (* destroy)(GALAXY *galaxy);<br />
+    void (* add_star)(GALAXY *galaxy, STAR *star);<br />
+} galaxy = {<br />
+    galaxy__create,<br />
+    galaxy__destroy,<br />
+    galaxy__add_star<br />
+};</p>
+<p>#endif /* GALAXY_H */[/sourcecode]</p>
+<p style="text-align:justify;">The user of the module can refer to its functions using the namespace. It is obvious that <code>galaxy.add_star</code> is a member of the galaxy "namespace". As long as no other symbols called galaxy are defined, there is no risk that <code>add_star</code> will conflict with another symbol in the program. The full name of the function is <code>galaxy__add_star</code> which obeys a traditional namespace convention.</p>
+<p>[sourcecode language="c"]/* main.c */<br />
+#include &quot;galaxy.h&quot;</p>
+<p>int main(void)<br />
+{<br />
+    /* Every call to a galaxy-related function is prefixed by the &quot;galaxy&quot; namespace. */<br />
+    GALAXY *g = galaxy.create();<br />
+    galaxy.add_star(g, s);<br />
+    galaxy.destroy(g);<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">Within the galaxy module, it is possible to avoid use of the namespace and refer to <code>galaxy__add_star</code> directly. This may make a difference to performance (discussed below).</p>
+<p>[sourcecode language="c"]/* galaxy.c */<br />
+GALAXY *galaxy__load(const char *filename)<br />
+{<br />
+    GALAXY *g = galaxy__create();<br />
+    ...<br />
+    while (!feof(f))<br />
+    {<br />
+        STAR *s = read_star(f);<br />
+        galaxy__add_star(s);<br />
+    }<br />
+    ...<br />
+    return g;<br />
+}[/sourcecode]</p>
+<h2>Tradeoffs</h2>
+<p style="text-align:justify;">There are some downsides to this approach.</p>
+<p style="text-align:justify;">The first is that the writer of the module needs to write a lot of header file boilerplate. Secondly, the users of the module need to use the namespace in every case -- there is no easy way import its symbols into their own code, as can be done with C++, Java or Python. They could refer to the symbol by its full name, but this is approximately as verbose.</p>
+<p style="text-align:justify;">There are limitations too. Types (structs, enums, typedefs) cannot be put in a namespace, because there is no way to represent them by variables. So we cannot have a type called "galaxy.GALAXY".</p>
+<p style="text-align:justify;">Having modifiable global variables in the namespace requires thought. As implemented above, the namespace becomes a distinct static object in every module that includes the header file. If it were to contain a variable (e.g. <code>galaxy.enable_tracing</code>), each module would have its own private copy of a "global" variable; setting <code>galaxy.enable_tracing</code> in main.c would not have any effect on the tracing code in galaxy.c.</p>
+<p style="text-align:justify;">For a namespace struct to support mutable global variables, it needs to be defined in one place only and referenced in all the compilation units that use it. So it cannot be a static header object. Instead, the above template becomes:</p>
+<p>[sourcecode language="c"]/* galaxy.h */<br />
+#ifndef GALAXY_H<br />
+#define GALAXY_H</p>
+<p>typedef struct STAR { ... } STAR;</p>
+<p>typedef struct GALAXY { ... } GALAXY;</p>
+<p>struct galaxy_struct<br />
+{<br />
+    GALAXY *(* create)(void);<br />
+    void (* destroy)(GALAXY *galaxy);<br />
+    void (* add_star)(GALAXY *galaxy, STAR *star);<br />
+    int enable_tracing;<br />
+};</p>
+<p>extern struct galaxy_struct galaxy;</p>
+<p>#endif /* GALAXY_H */</p>
+<p>/* galaxy.c */<br />
+#include &quot;galaxy.h&quot;</p>
+<p>/* The single instance of the namespace object. */<br />
+struct galaxy_struct galaxy =<br />
+{<br />
+    galaxy__create,<br />
+    galaxy__destroy,<br />
+    galaxy__add_star,<br />
+    0<br />
+} galaxy;[/sourcecode]</p>
+<p style="text-align:justify;">This also moves some of the verbiage out of the header and into the private implementation file, which is useful, too.  It means the full names of the library functions can be shortened, since they no longer need to be externally visible (assuming they are defined in the same module as the namespace instance).</p>
+<h2>Efficiency considerations</h2>
+<p style="text-align:justify;">Using the first implementation of a namespace, as a static variable in a header file, means that each compilation unit that includes that header gets its own private copy. The const qualifier means the compiler can, in theory, inline all uses of the struct members with the functions themselves. Does this happen in practice?</p>
+<p>[sourcecode language="c"]#include</p>
+<p>void f1(int x)<br />
+{<br />
+    printf(&quot;f1 %d\n&quot;, x);<br />
+}</p>
+<p>void ns_f2(int x)<br />
+{<br />
+    printf(&quot;f2 %\n&quot;, x);<br />
+}</p>
+<p>static const struct {<br />
+    int filler;<br />
+    void (* f2)(int x);<br />
+} ns = { ns_f2 };</p>
+<p>struct nsx_struct {<br />
+    int filler;<br />
+    void (* f3)(int x);<br />
+};</p>
+<p>extern struct nsx_struct nsx;</p>
+<p>int main(void)<br />
+{<br />
+    f1(1);<br />
+    ns.f2(2);<br />
+    nsx.f3(2);<br />
+}[/sourcecode]</p>
+<p style="text-align:justify;">Without optimisation, the three calls are compiled by GCC to:</p>
+<p>[sourcecode language="c"]; Call f1, directly<br />
+	movl	$1, (%esp)<br />
+	call	_f1<br />
+; Call ns.f2 via the local, static namespace<br />
+	movl	_ns+4, %eax<br />
+	movl	$2, (%esp)<br />
+	call	*%eax<br />
+; Call nsx.f3 via the external namespace<br />
+	movl	_nsx+4, %eax<br />
+	movl	$2, (%esp)<br />
+	call	*%eax<br />
+[/sourcecode]</p>
+<p style="text-align:justify;">So, calling a function in a namespace requires looking up the function in the struct, including applying its offset, and calling it via a register.</p>
+<p style="text-align:justify;">At optimisation level 1 and higher, this becomes:</p>
+<p>[sourcecode language="c"]; Call f1, directly<br />
+	movl	$1, (%esp)<br />
+	call	_f1<br />
+; Call ns.f2 via the local, static namespace<br />
+	movl	$2, (%esp)<br />
+	call	*_ns+4<br />
+; Call nsx.f3 via the external namespace<br />
+	movl	$2, (%esp)<br />
+	call	*_nsx+4<br />
+[/sourcecode]</p>
+<p style="text-align:justify;">In practice (with this compiler), the local namespace and the external namespace call compiled to the same instructions. Testing showed that if <code>f2</code> is the first element in <code>ns</code>, then the call to <code>f2</code> can be optimised to a direct call (as with <code>f1</code>). However, adding filler prevents this optimisation in GCC. I suspect this is because it is difficult to express the jump to an offset of a symbol at the link level.</p>
+<p style="text-align:justify;"><strong>Further reading.</strong> This <a title="Namespaces in C on StackOverflow" href="http://stackoverflow.com/questions/389827/namespaces-in-c">StackOverflow question</a> has more discussion on the above technique, and additional suggestions for C namespaces.</p>
